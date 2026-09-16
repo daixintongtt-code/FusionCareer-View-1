@@ -181,29 +181,72 @@
             </div>
           </div>
 
-          <div v-if="!editingId" class="card card-p" style="margin-bottom:1rem">
-            <div class="form-section-title">智能解析岗位描述</div>
-            <div class="form-group">
-              <label class="form-label">岗位原文</label>
-              <textarea class="form-control" style="min-height:140px" v-model="rawJobText" placeholder="粘贴完整岗位描述，系统将提取公司、岗位、地点、薪资和任职要求等字段…" />
-            </div>
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;margin-top:.875rem">
-              <span style="font-size:.75rem;color:var(--ink-3)">解析结果只会填入下方表单，请检查并编辑后再发布。</span>
-              <button type="button" class="btn btn-primary btn-sm" :disabled="structuring || !rawJobText.trim()" @click="structureJob">
-                <i :class="['ti', structuring ? 'ti-loader-2' : 'ti-sparkles']" />{{ structuring ? '正在解析…' : '解析并填充' }}
-              </button>
-            </div>
-            <div v-if="structureWarnings.length" style="margin-top:.75rem;padding:.65rem .8rem;border-radius:var(--r-md);background:#fff8e6;color:#8a5a00;font-size:.76rem">
-              <div v-for="warning in structureWarnings" :key="warning">{{ warning }}</div>
-            </div>
-            <div v-if="structuredJobs.length>1" style="margin-top:.75rem">
-              <div style="font-size:.78rem;color:var(--ink-2);margin-bottom:.45rem">识别到多个岗位，请选择一个继续编辑：</div>
-              <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-                <button v-for="(job, index) in structuredJobs" :key="index" type="button" class="btn btn-secondary btn-sm" @click="applyStructuredJob(job)">
-                  {{ job.companyName || '未知公司' }} · {{ job.positionName || `岗位 ${index + 1}` }}
+          <div v-if="!editingId" class="create-entry-grid">
+            <section class="card card-p create-entry-card">
+              <div class="form-section-title">智能解析岗位描述</div>
+              <div class="form-group">
+                <label class="form-label">岗位原文</label>
+                <textarea class="form-control" style="min-height:140px" v-model="rawJobText" placeholder="粘贴完整岗位描述，系统将提取公司、岗位、地点、薪资和任职要求等字段…" />
+              </div>
+              <div class="create-entry-actions">
+                <span class="create-entry-hint">解析结果只会填入下方表单，请检查并编辑后再发布。</span>
+                <button type="button" class="btn btn-primary btn-sm" :disabled="structuring || !rawJobText.trim()" @click="structureJob">
+                  <i :class="['ti', structuring ? 'ti-loader-2' : 'ti-sparkles']" />{{ structuring ? '正在解析…' : '解析并填充' }}
                 </button>
               </div>
-            </div>
+              <div v-if="structureWarnings.length" class="structure-warning" role="alert">
+                <div v-for="warning in structureWarnings" :key="warning">{{ warning }}</div>
+              </div>
+              <div v-if="structuredJobs.length>1" style="margin-top:.75rem">
+                <div style="font-size:.78rem;color:var(--ink-2);margin-bottom:.45rem">识别到多个岗位，请选择一个继续编辑：</div>
+                <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+                  <button v-for="(job, index) in structuredJobs" :key="index" type="button" class="btn btn-secondary btn-sm" @click="applyStructuredJob(job)">
+                    {{ job.companyName || '未知公司' }} · {{ job.positionName || `岗位 ${index + 1}` }}
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <section class="card card-p create-entry-card">
+              <div class="form-section-title">批量导入岗位</div>
+              <div class="bulk-import-intro">
+                <div><span>1</span>下载模板并按填写说明录入岗位</div>
+                <div><span>2</span>上传 Excel，系统解析后统一存入草稿箱</div>
+              </div>
+              <div class="bulk-import-note">
+                模板已按学院第一/第二批大实习、小实习岗位表调整；薪资等不对外信息默认不公开。
+              </div>
+              <a class="btn btn-secondary btn-sm bulk-template-link" :href="JOB_IMPORT_TEMPLATE_URL" download="岗位批量导入模板.xlsx">
+                <i class="ti ti-download" />下载 Excel 模板
+              </a>
+              <input ref="bulkImportInput" class="sr-only" type="file" accept=".xlsx,.xls" @change="handleBulkImportChange" />
+              <button
+                type="button"
+                :class="['bulk-upload-zone', bulkDragActive && 'dragging', bulkImportFile && 'has-file']"
+                :disabled="bulkImporting"
+                @click="bulkImportInput?.click()"
+                @dragenter.prevent="bulkDragActive=true"
+                @dragover.prevent="bulkDragActive=true"
+                @dragleave.prevent="bulkDragActive=false"
+                @drop.prevent="handleBulkImportDrop"
+              >
+                <i :class="['ti', bulkImporting ? 'ti-loader-2' : bulkImportFile ? 'ti-file-spreadsheet' : 'ti-cloud-upload']" />
+                <template v-if="bulkImportFile">
+                  <strong>{{ bulkImportFile.name }}</strong>
+                  <span>{{ formatFileSize(bulkImportFile.size) }} · 点击可重新选择</span>
+                </template>
+                <template v-else>
+                  <strong>点击选择或拖拽 Excel 文件到此处</strong>
+                  <span>支持 .xlsx、.xls，文件不超过 10 MB</span>
+                </template>
+              </button>
+              <div class="create-entry-actions">
+                <span class="create-entry-hint">成功导入的岗位不会直接发布。</span>
+                <button type="button" class="btn btn-primary btn-sm" :disabled="bulkImporting || !bulkImportFile" @click="importJobWorkbook">
+                  <i :class="['ti', bulkImporting ? 'ti-loader-2' : 'ti-file-import']" />{{ bulkImporting ? '正在上传并解析…' : '上传并导入' }}
+                </button>
+              </div>
+            </section>
           </div>
 
           <div class="card card-p" style="margin-bottom:1rem">
@@ -464,6 +507,29 @@
           <div class="page-hd">
             <div><h1><i class="ti ti-inbox" />草稿箱</h1></div>
           </div>
+          <div v-if="bulkImportResult" :class="['bulk-import-result', (bulkImportResult.failedCount > 0 || bulkImportResult.warnings.length > 0) && 'has-warnings']" role="status">
+            <i :class="['ti', (bulkImportResult.failedCount > 0 || bulkImportResult.warnings.length > 0) ? 'ti-alert-circle' : 'ti-circle-check-filled']" />
+            <div style="flex:1;min-width:0">
+              <strong>{{ bulkImportResult.failedCount > 0 ? '批量导入已完成，请检查失败记录' : bulkImportResult.warnings.length > 0 ? '岗位已导入草稿箱，请复核提醒' : '岗位已批量导入草稿箱' }}</strong>
+              <div>
+                <template v-if="bulkImportResult.successCount != null">成功 {{ bulkImportResult.successCount }} 条</template>
+                <template v-else>导入请求已完成</template>
+                <template v-if="bulkImportResult.failedCount > 0">，失败 {{ bulkImportResult.failedCount }} 条</template>
+              </div>
+              <ul v-if="bulkImportResult.errors.length">
+                <li v-for="error in bulkImportResult.errors.slice(0, 5)" :key="error">{{ error }}</li>
+                <li v-if="bulkImportResult.errors.length > 5">另有 {{ bulkImportResult.errors.length - 5 }} 条错误，请修改文件后重新导入。</li>
+              </ul>
+              <div v-if="bulkImportResult.warnings.length" class="bulk-import-warnings">
+                <b>待复核 {{ bulkImportResult.warnings.length }} 条：</b>
+                <ul>
+                  <li v-for="warning in bulkImportResult.warnings.slice(0, 5)" :key="warning">{{ warning }}</li>
+                  <li v-if="bulkImportResult.warnings.length > 5">另有 {{ bulkImportResult.warnings.length - 5 }} 条提醒。</li>
+                </ul>
+              </div>
+            </div>
+            <button type="button" class="btn-icon" aria-label="关闭导入结果" @click="bulkImportResult=null"><i class="ti ti-x" /></button>
+          </div>
           <div v-if="draftsLoading" class="card table-state">草稿加载中…</div>
           <div v-else-if="displayDraftError" class="card table-state" role="alert">
             <div>{{ displayDraftError }}</div>
@@ -496,6 +562,7 @@
                     <td>{{ j.applicationDeadline || '—' }}</td>
                     <td>
                       <span v-if="j.sourceType==='CRAWL'" class="badge" style="background:var(--blue-bg,#eaf0fb);color:var(--blue,#1b4f9c);gap:3px;font-size:.7rem"><i class="ti ti-robot" style="font-size:9px" />自动导入</span>
+                      <span v-else-if="['EXCEL','IMPORT','BATCH_IMPORT'].includes(j.sourceType)" class="badge badge-gold" style="font-size:.7rem"><i class="ti ti-file-spreadsheet" />表格导入</span>
                       <span v-else class="badge badge-gray" style="font-size:.7rem">手动录入</span>
                     </td>
                     <td>
@@ -804,7 +871,13 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useToast } from '@/composables/useToast'
-import { apiDownloadBlob, apiJson, logoutSession } from '@/lib/api'
+import { apiDownloadBlob, apiForm, apiJson, logoutSession } from '@/lib/api'
+import {
+  JOB_IMPORT_ENDPOINT,
+  JOB_IMPORT_TEMPLATE_PATH,
+  normalizeJobImportResult,
+  validateJobImportFile,
+} from '@/lib/jobImport.mjs'
 import PageJump from '@/components/PageJump.vue'
 
 const toast = useToast()
@@ -825,6 +898,12 @@ const rawJobText = ref('')
 const structuring = ref(false)
 const structuredJobs = ref([])
 const structureWarnings = ref([])
+const bulkImportInput = ref(null)
+const bulkImportFile = ref(null)
+const bulkImporting = ref(false)
+const bulkDragActive = ref(false)
+const bulkImportResult = ref(null)
+const JOB_IMPORT_TEMPLATE_URL = `${import.meta.env.BASE_URL}${JOB_IMPORT_TEMPLATE_PATH}`
 const displayUsers = ref([])
 const searchUsername = ref('')
 const searchUserRole = ref('')
@@ -1187,6 +1266,69 @@ function draftToggleSel(id) { draftSelected.value.includes(id) ? draftSelected.v
 function draftBulkPublish() { selected.value = [...draftSelected.value]; return bulkPublish() }
 function draftBulkDelete() { bulkDelete([...draftSelected.value]) }
 
+function formatFileSize(bytes) {
+  const readBytes = Number(bytes || 0)
+  if (readBytes < 1024) return `${readBytes} B`
+  if (readBytes < 1024 * 1024) return `${(readBytes / 1024).toFixed(1)} KB`
+  return `${(readBytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+function selectBulkImportFile(file) {
+  const readError = validateJobImportFile(file)
+  if (readError) {
+    bulkImportFile.value = null
+    toast.error(readError)
+    return
+  }
+  bulkImportFile.value = file
+}
+
+function handleBulkImportChange(event) {
+  selectBulkImportFile(event.target.files?.[0])
+  event.target.value = ''
+}
+
+function handleBulkImportDrop(event) {
+  bulkDragActive.value = false
+  selectBulkImportFile(event.dataTransfer?.files?.[0])
+}
+
+async function importJobWorkbook() {
+  if (!bulkImportFile.value || bulkImporting.value) return
+  const readError = validateJobImportFile(bulkImportFile.value)
+  if (readError) {
+    toast.error(readError)
+    return
+  }
+
+  bulkImporting.value = true
+  bulkImportResult.value = null
+  const readForm = new FormData()
+  readForm.append('file', bulkImportFile.value)
+  try {
+    // 后端联调约定：multipart 字段名为 file；解析成功的岗位统一保存为 OFFLINE 草稿。
+    const readResult = await apiForm(JOB_IMPORT_ENDPOINT, readForm)
+    bulkImportResult.value = normalizeJobImportResult(readResult)
+    bulkImportFile.value = null
+    readDraftPage.value = 1
+    await loadDrafts()
+    v.value = 'drafts'
+    if (bulkImportResult.value.failedCount > 0) {
+      toast.error(`导入完成，${bulkImportResult.value.failedCount} 条记录失败`)
+    } else if (bulkImportResult.value.warnings.length > 0) {
+      toast.success(`已导入草稿箱，${bulkImportResult.value.warnings.length} 条需复核`)
+    } else if (bulkImportResult.value.successCount != null) {
+      toast.success(`已导入 ${bulkImportResult.value.successCount} 条岗位到草稿箱`)
+    } else {
+      toast.success('岗位已导入草稿箱')
+    }
+  } catch (error) {
+    toast.error(error?.message || '岗位批量导入失败，请检查模板后重试')
+  } finally {
+    bulkImporting.value = false
+  }
+}
+
 const NJ_INIT = () => ({
   sourceType: 'PLATFORM',
   sourceUrl: '',
@@ -1297,6 +1439,8 @@ function _resetForm() {
   rawJobText.value = ''
   structuredJobs.value = []
   structureWarnings.value = []
+  bulkImportFile.value = null
+  bulkDragActive.value = false
 }
 
 function startCreate() {
@@ -1603,6 +1747,130 @@ async function exportData(readFormat) {
   color: var(--ink-3);
 }
 .table-state .btn { margin-top: .75rem; }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── 新建岗位入口：智能解析 + 表格批量导入 ── */
+.create-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.create-entry-card { min-width: 0; }
+.create-entry-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  flex-wrap: wrap;
+  margin-top: .875rem;
+}
+.create-entry-hint { font-size: .75rem; color: var(--ink-3); }
+.structure-warning {
+  margin-top: .75rem;
+  padding: .65rem .8rem;
+  border-radius: var(--r-md);
+  background: var(--amber-bg);
+  color: var(--amber);
+  font-size: .76rem;
+}
+.bulk-import-intro {
+  display: grid;
+  gap: .4rem;
+  color: var(--ink-2);
+  font-size: .78rem;
+  margin-bottom: .75rem;
+}
+.bulk-import-intro div { display: flex; align-items: center; gap: .45rem; }
+.bulk-import-intro span {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: var(--gold-light);
+  color: var(--gold);
+  font-size: .68rem;
+  font-weight: 700;
+}
+.bulk-import-note {
+  margin: .75rem 0;
+  padding: .6rem .7rem;
+  border-radius: var(--r-sm);
+  background: var(--amber-bg);
+  color: var(--amber);
+  font-size: .74rem;
+  line-height: 1.55;
+}
+.bulk-template-link { margin-bottom: .75rem; }
+.bulk-upload-zone {
+  width: 100%;
+  min-height: 140px;
+  padding: 1rem;
+  border: 1.5px dashed var(--border-mid);
+  border-radius: var(--r-lg);
+  background: var(--bg-soft);
+  color: var(--ink-2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  text-align: center;
+  transition: border-color var(--t), background var(--t), color var(--t);
+}
+.bulk-upload-zone:hover,
+.bulk-upload-zone:focus-visible,
+.bulk-upload-zone.dragging {
+  outline: none;
+  border-color: var(--gold);
+  background: var(--gold-light);
+}
+.bulk-upload-zone.has-file { border-style: solid; border-color: var(--gold); background: var(--gold-light); }
+.bulk-upload-zone:disabled { cursor: wait; opacity: .7; }
+.bulk-upload-zone > i { font-size: 1.75rem; color: var(--gold); }
+.bulk-upload-zone strong { font-size: .84rem; font-weight: 600; max-width: 100%; overflow-wrap: anywhere; }
+.bulk-upload-zone span { font-size: .73rem; color: var(--ink-3); }
+.bulk-upload-zone .ti-loader-2,
+.create-entry-actions .ti-loader-2 { animation: import-spin .8s linear infinite; }
+@keyframes import-spin { to { transform: rotate(360deg); } }
+
+.bulk-import-result {
+  display: flex;
+  align-items: flex-start;
+  gap: .75rem;
+  padding: .8rem 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid rgba(30, 102, 54, .25);
+  border-radius: var(--r-md);
+  background: var(--green-bg);
+  color: var(--green);
+  font-size: .78rem;
+}
+.bulk-import-result > i { font-size: 1.2rem; margin-top: .1rem; }
+.bulk-import-result strong { display: block; margin-bottom: .15rem; font-size: .82rem; }
+.bulk-import-result ul { margin-top: .45rem; padding-left: 1rem; list-style: disc; color: var(--ink-2); }
+.bulk-import-warnings { margin-top: .55rem; color: var(--amber); }
+.bulk-import-warnings ul { margin-top: .25rem; }
+.bulk-import-result.has-warnings { border-color: rgba(122, 79, 0, .25); background: var(--amber-bg); color: var(--amber); }
+.bulk-import-result .btn-icon { margin-left: auto; flex-shrink: 0; }
+
+@media (max-width: 1050px) {
+  .create-entry-grid { grid-template-columns: 1fr; }
+}
 
 /* ── PDF 预览弹窗 ── */
 .preview-box {
