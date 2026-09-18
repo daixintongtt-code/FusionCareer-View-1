@@ -8,7 +8,7 @@ const routes = [
   { path: '/home',     component: () => import('@/views/HomeView.vue'),     meta: { title: '岗位列表', requiresAuth: true } },
   { path: '/job/:id',  component: () => import('@/views/JobDetailView.vue'),meta: { title: '岗位详情', requiresAuth: true } },
   { path: '/profile',  component: () => import('@/views/ProfileView.vue'),  meta: { title: '个人中心', requiresAuth: true } },
-  { path: '/admin',    component: () => import('@/views/AdminView.vue'),    meta: { title: '管理后台', requiresAuth: true, roles: ['ADMIN'] } },
+  { path: '/admin',    component: () => import('@/views/AdminView.vue'),    meta: { title: '管理后台', requiresAuth: true, roles: ['ADMIN', 'SUPER_ADMIN'] } },
 ]
 
 const router = createRouter({

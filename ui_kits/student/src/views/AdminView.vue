@@ -33,8 +33,10 @@
         <button :class="['sidebar-link', v==='drafts'&&'active']" @click="showDrafts"><i class="ti ti-inbox" />草稿箱<span v-if="readDraftTotal>0" class="sidebar-badge">{{ readDraftTotal }}</span></button>
         <button :class="['sidebar-link', v==='recycle'&&'active']" @click="showRecycleBin"><i class="ti ti-recycle" />回收站</button>
         <button :class="['sidebar-link', v==='resumes'&&'active']" @click="showResumes"><i class="ti ti-file-text" />简历管理</button>
-        <div class="sidebar-label">系统管理</div>
-        <button :class="['sidebar-link', v==='users'&&'active']" @click="showUsers"><i class="ti ti-users" />用户管理</button>
+        <template v-if="isSuperAdmin">
+          <div class="sidebar-label">系统管理</div>
+          <button :class="['sidebar-link', v==='users'&&'active']" @click="showUsers"><i class="ti ti-users" />用户管理</button>
+        </template>
       </aside>
 
       <main class="admin-main">
@@ -48,7 +50,7 @@
           <div style="display:flex;align-items:center;gap:.625rem;margin-bottom:1.1rem;flex-wrap:wrap">
             <input class="form-control" style="flex:1;min-width:180px;padding:.5rem .875rem" v-model="searchUsername" placeholder="搜索用户名..." @keyup.enter="searchUsers" />
             <select class="form-control" style="min-width:120px;padding:.5rem .875rem" v-model="searchUserRole" @change="searchUsers">
-              <option value="">全部角色</option><option value="ADMIN">管理员</option><option value="NORMAL">普通用户</option>
+              <option value="">全部角色</option><option value="SUPER_ADMIN">超级管理员</option><option value="ADMIN">管理员</option><option value="NORMAL">普通用户</option>
             </select>
             <button class="btn btn-secondary btn-sm" @click="searchUsers"><i class="ti ti-search" />搜索</button>
           </div>
@@ -56,30 +58,33 @@
           <div class="card" style="overflow:auto">
             <table class="data-table">
               <thead>
-                <tr><th>用户名</th><th>学工号</th><th>角色</th><th>状态</th><th>注册时间</th><th>操作</th></tr>
+                <tr><th>用户名</th><th>学工号</th><th>角色</th><th>注册时间</th><th>操作</th></tr>
               </thead>
               <tbody>
-                <tr v-if="usersLoading"><td colspan="6" class="table-state">用户加载中…</td></tr>
+                <tr v-if="usersLoading"><td colspan="5" class="table-state">用户加载中…</td></tr>
                 <tr v-else-if="displayUserError">
-                  <td colspan="6" class="table-state" role="alert">
+                  <td colspan="5" class="table-state" role="alert">
                     <div>{{ displayUserError }}</div>
                     <button class="btn btn-secondary btn-sm" @click="loadUsers">重新加载</button>
                   </td>
                 </tr>
-                <tr v-else-if="!displayUsers.length"><td colspan="6" class="table-state">暂无用户</td></tr>
+                <tr v-else-if="!displayUsers.length"><td colspan="5" class="table-state">暂无用户</td></tr>
                 <tr v-for="user in displayUsers" v-else :key="user.id">
                   <td style="font-weight:600">{{ user.username || '—' }}</td>
                   <td style="font-family:monospace;color:var(--ink-2)">{{ user.studentId || '—' }}</td>
-                  <td><span :class="['badge', user.role==='ADMIN'?'badge-red':'badge-gray']">{{ user.role==='ADMIN'?'管理员':'普通用户' }}</span></td>
-                  <td><span :class="['badge', user.status==='NORMAL'?'badge-green':'badge-gray']">{{ user.status==='NORMAL'?'正常':'已禁用' }}</span></td>
+                  <td><span :class="['badge', roleClass(user.role)]">{{ roleLabel(user.role) }}</span></td>
                   <td style="color:var(--ink-3)">{{ user.createdAt?.replace('T', ' ').slice(0, 16) || '—' }}</td>
                   <td>
-                    <button
-                      type="button"
-                      :class="['btn', user.role==='ADMIN'?'btn-secondary':'btn-red-soft', 'btn-sm']"
+                    <select
+                      class="form-control role-select"
+                      :value="user.role"
                       :disabled="updatingUserId===user.id"
-                      @click="changeRole(user)"
-                    >{{ updatingUserId===user.id ? '修改中…' : user.role==='ADMIN' ? '撤销管理员' : '设为管理员' }}</button>
+                      @change="changeRole(user, $event.target.value, $event)"
+                    >
+                      <option value="NORMAL">普通用户</option>
+                      <option value="ADMIN">管理员</option>
+                      <option value="SUPER_ADMIN">超级管理员</option>
+                    </select>
                   </td>
                 </tr>
               </tbody>
@@ -885,6 +890,8 @@ const selected     = ref([])
 const draftSelected = ref([])
 const displayAdminName = ref('管理员')
 const displayAdminInitial = computed(() => displayAdminName.value.trim().charAt(0) || '管')
+const adminRole = ref('')
+const isSuperAdmin = computed(() => adminRole.value === 'SUPER_ADMIN')
 const jobsLoading = ref(true)
 const displayJobError = ref('')
 const draftsLoading = ref(true)
@@ -910,6 +917,18 @@ const updatingUserId = ref(null)
 const readUserPage = ref(1)
 const readUserTotal = ref(0)
 const readUserPages = ref(1)
+const ROLE_LABEL = {
+  SUPER_ADMIN: '超级管理员',
+  ADMIN: '管理员',
+  NORMAL: '普通用户',
+}
+const ROLE_CLASS = {
+  SUPER_ADMIN: 'badge-gold',
+  ADMIN: 'badge-red',
+  NORMAL: 'badge-gray',
+}
+const roleLabel = readRole => ROLE_LABEL[readRole] || readRole || '未知角色'
+const roleClass = readRole => ROLE_CLASS[readRole] || 'badge-gray'
 
 // 通用确认弹窗
 const show_confirm = ref(false)
@@ -947,6 +966,7 @@ async function loadUsers() {
 }
 
 function showUsers() {
+  if (!isSuperAdmin.value) return
   v.value = 'users'
   loadUsers()
 }
@@ -962,11 +982,10 @@ function changeUserPage(readPage) {
   loadUsers()
 }
 
-function changeRole(updateUser) {
-  const updateRole = updateUser.role === 'ADMIN' ? 'NORMAL' : 'ADMIN'
-  confirm_msg.value = updateRole === 'ADMIN'
-    ? `确认将“${updateUser.username || updateUser.studentId}”设为管理员？`
-    : `确认撤销“${updateUser.username || updateUser.studentId}”的管理员权限？`
+function changeRole(updateUser, updateRole, readEvent) {
+  if (readEvent?.target) readEvent.target.value = updateUser.role
+  if (!updateRole || updateRole === updateUser.role) return
+  confirm_msg.value = `确认将“${updateUser.username || updateUser.studentId}”的权限修改为${roleLabel(updateRole)}？`
   confirm_cb.value = () => updateUserRole(updateUser, updateRole)
   show_confirm.value = true
 }
@@ -978,7 +997,7 @@ async function updateUserRole(updateUser, updateRole) {
       method:'PUT',
     })
     Object.assign(updateUser, readUser)
-    toast.success(updateRole === 'ADMIN' ? '已设为管理员' : '已撤销管理员权限')
+    toast.success(`已修改为${roleLabel(updateRole)}`)
   } catch (readError) {
     toast.error(readError?.message || '管理员权限修改失败')
   } finally {
@@ -1033,8 +1052,10 @@ async function loadAdmin() {
     ])
     displayAdminName.value = readProfile?.realName
       || readUser?.username || readUser?.studentId || '管理员'
+    adminRole.value = readUser?.role || ''
   } catch {
     displayAdminName.value = '管理员'
+    adminRole.value = ''
   }
 }
 
@@ -1737,6 +1758,12 @@ async function exportData(readFormat) {
   cursor: wait;
   opacity: .6;
   pointer-events: none;
+}
+.role-select {
+  width: 128px;
+  min-height: 30px;
+  padding: .3rem 1.7rem .3rem .6rem;
+  font-size: .75rem;
 }
 .table-state {
   padding: 2.5rem !important;
