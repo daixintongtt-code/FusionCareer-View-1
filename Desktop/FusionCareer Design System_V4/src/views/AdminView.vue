@@ -203,7 +203,7 @@
             <div class="smart-entry-head">
               <div class="smart-entry-icon"><i class="ti ti-sparkles" /></div>
               <div>
-                <div class="smart-entry-title">智能生成标准岗位信息 <span>推荐</span></div>
+                <div class="smart-entry-title">智能生成标准岗位信息</div>
                 <div class="smart-entry-desc">粘贴招聘公告、邮件或网页中的完整岗位描述，系统将识别并填入下方标准字段。</div>
               </div>
             </div>
@@ -1681,43 +1681,40 @@ async function exportData(readFormat) {
 }
 .create-entry-grid {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem; margin-bottom: 1rem;
+  gap: 1.125rem; margin-bottom: 1rem; align-items: stretch;
 }
+.smart-entry-card,
 .create-entry-card {
-  min-width: 0; border-color: rgba(184,135,30,.25);
-  background: linear-gradient(145deg, #fff 0%, #fffdf7 100%);
-}
-.create-entry-card .smart-entry-icon {
-  color: var(--gold); background: var(--gold-light); border-color: rgba(184,135,30,.3);
+  min-width: 0; display: flex; flex-direction: column;
+  border-color: var(--border-mid); background: var(--bg-card);
+  box-shadow: 0 1px 2px rgba(28,26,24,.035), 0 10px 28px rgba(28,26,24,.045);
 }
 .smart-entry-card {
   position: relative; overflow: hidden;
+}
+.smart-entry-card:hover,
+.create-entry-card:hover {
   border-color: var(--red-border);
-  background: linear-gradient(145deg, #fff 0%, #fffafb 100%);
+  box-shadow: 0 2px 4px rgba(28,26,24,.04), 0 14px 34px rgba(28,26,24,.07);
 }
-.smart-entry-card::after {
-  content: ''; position: absolute; width: 180px; height: 180px;
-  right: -75px; top: -90px; border-radius: 50%;
-  background: radial-gradient(circle, rgba(164,31,51,.09), rgba(164,31,51,0) 70%);
-  pointer-events: none;
+.smart-entry-head {
+  display: flex; align-items: flex-start; gap: .8rem;
+  min-height: 48px; position: relative; z-index: 1;
 }
-.smart-entry-head { display: flex; align-items: flex-start; gap: .8rem; position: relative; z-index: 1; }
 .smart-entry-icon {
-  width: 38px; height: 38px; border-radius: 12px;
+  width: 40px; height: 40px; border-radius: 11px;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   color: var(--red); background: var(--red-light); border: 1px solid var(--red-border);
 }
 .smart-entry-icon i { font-size: 1.1rem; }
 .smart-entry-title { font-size: .94rem; font-weight: 700; color: var(--ink); display: flex; align-items: center; gap: .45rem; }
-.smart-entry-title span {
-  font-size: .66rem; font-weight: 700; color: var(--red);
-  background: var(--red-light); border: 1px solid var(--red-border);
-  padding: .1rem .45rem; border-radius: 999px;
-}
 .smart-entry-desc { font-size: .78rem; color: var(--ink-2); line-height: 1.55; margin-top: .22rem; }
-.smart-source-input { min-height: 168px; resize: vertical; line-height: 1.65; padding: .8rem .9rem; background: rgba(255,255,255,.82); }
-.smart-entry-actions { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-top: .7rem; }
-.smart-entry-actions > span { font-size: .72rem; color: var(--ink-3); }
+.smart-source-input { min-height: 168px; resize: vertical; line-height: 1.65; padding: .8rem .9rem; background: var(--bg-card); }
+.smart-entry-actions {
+  display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+  margin-top: auto; padding-top: .875rem;
+}
+.smart-entry-actions > span { font-size: .72rem; color: var(--ink-3); white-space: nowrap; }
 .smart-parse-btn { min-width: 168px; justify-content: center; }
 .smart-parse-btn:disabled { opacity: .68; cursor: wait; }
 .smart-spinner { animation: smartSpin .8s linear infinite; }
@@ -1739,7 +1736,7 @@ async function exportData(readFormat) {
 .bulk-import-intro span {
   width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
   display: inline-flex; align-items: center; justify-content: center;
-  background: var(--gold-light); color: var(--gold); font-size: .68rem; font-weight: 700;
+  background: var(--red-light); color: var(--red); font-size: .68rem; font-weight: 700;
 }
 .bulk-template-link { margin-bottom: .75rem; }
 .bulk-upload-zone {
@@ -1753,16 +1750,16 @@ async function exportData(readFormat) {
 .bulk-upload-zone:hover,
 .bulk-upload-zone:focus-visible,
 .bulk-upload-zone.dragging {
-  outline: none; border-color: var(--gold); background: var(--gold-light);
+  outline: none; border-color: var(--red); background: var(--red-light);
 }
-.bulk-upload-zone.has-file { border-style: solid; border-color: var(--gold); background: var(--gold-light); }
+.bulk-upload-zone.has-file { border-style: solid; border-color: var(--red); background: var(--red-light); }
 .bulk-upload-zone:disabled { cursor: wait; opacity: .7; }
-.bulk-upload-zone > i { font-size: 1.75rem; color: var(--gold); }
+.bulk-upload-zone > i { font-size: 1.75rem; color: var(--red); }
 .bulk-upload-zone strong { font-size: .84rem; font-weight: 600; max-width: 100%; overflow-wrap: anywhere; }
 .bulk-upload-zone span { font-size: .73rem; color: var(--ink-3); }
 .bulk-import-actions {
   display: flex; align-items: center; justify-content: space-between;
-  gap: .75rem; flex-wrap: wrap; margin-top: .875rem;
+  gap: .75rem; flex-wrap: wrap; margin-top: auto; padding-top: .875rem;
 }
 .bulk-import-actions > span { font-size: .75rem; color: var(--ink-3); }
 .bulk-upload-zone .ti-loader-2,
@@ -2074,12 +2071,15 @@ async function exportData(readFormat) {
   .user-page-head { flex-direction: column; }
   .user-toolbar { grid-template-columns: 1fr; }
   .user-profile-grid, .user-resume-grid { grid-template-columns: 1fr; }
-  .create-entry-grid { grid-template-columns: 1fr; }
   .smart-entry-actions { align-items: stretch; flex-direction: column; }
   .bulk-import-actions { align-items: stretch; flex-direction: column; }
   .bulk-import-actions .btn { width: 100%; justify-content: center; }
   .smart-parse-btn { width: 100%; }
   .smart-source-input { min-height: 210px; }
+}
+
+@media (max-width: 1120px) {
+  .create-entry-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 900px) {
