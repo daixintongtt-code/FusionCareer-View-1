@@ -2,6 +2,16 @@ import { deleteToken, readJson, readToken, saveToken } from '@/lib/api'
 
 let readUserCache = null
 
+function createDevUser(readRole) {
+  const readIsAdmin = readRole === 'ADMIN'
+  return {
+    id: readIsAdmin ? 1 : 2,
+    username: readIsAdmin ? '演示管理员' : '演示学生',
+    studentId: readIsAdmin ? 'admin-demo' : 'student-demo',
+    role: readIsAdmin ? 'ADMIN' : 'NORMAL',
+  }
+}
+
 export function consumeToken() {
   const updateUrl = new URL(window.location.href)
   let readValue = updateUrl.searchParams.get('token')
@@ -28,13 +38,26 @@ export function consumeToken() {
 }
 
 export async function readUser(readRefresh = false) {
-  if (!readToken()) return null
+  const readValue = readToken()
+  if (!readValue) return null
+  if (import.meta.env.DEV && readValue.startsWith('local-demo-')) {
+    const readRole = readValue.slice('local-demo-'.length) === 'ADMIN' ? 'ADMIN' : 'NORMAL'
+    readUserCache = createDevUser(readRole)
+    return readUserCache
+  }
   if (!readRefresh && readUserCache) return readUserCache
   readUserCache = await readJson('/user/me')
   return readUserCache
 }
 
 export function loginUser(readRole) {
+  if (import.meta.env.DEV) {
+    const readDevRole = readRole === 'ADMIN' ? 'ADMIN' : 'NORMAL'
+    saveToken(`local-demo-${readDevRole}`)
+    readUserCache = createDevUser(readDevRole)
+    window.location.hash = readDevRole === 'ADMIN' ? '#/admin' : '#/home'
+    return
+  }
   const readQuery = import.meta.env.DEV && readRole
     ? `?role=${encodeURIComponent(readRole)}`
     : ''
