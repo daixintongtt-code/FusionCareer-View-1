@@ -213,9 +213,6 @@
                 <div><span>1</span>下载模板并按填写说明录入岗位</div>
                 <div><span>2</span>上传 Excel，系统解析后统一存入草稿箱</div>
               </div>
-              <div class="bulk-import-note">
-                模板已按学院第一/第二批大实习、小实习岗位表调整；薪资等不对外信息默认不公开。
-              </div>
               <a class="btn btn-secondary btn-sm bulk-template-link" :href="JOB_IMPORT_TEMPLATE_URL" download="岗位批量导入模板.xlsx">
                 <i class="ti ti-download" />下载 Excel 模板
               </a>
@@ -1805,15 +1802,6 @@ async function exportData(readFormat) {
   color: var(--gold);
   font-size: .68rem;
   font-weight: 700;
-}
-.bulk-import-note {
-  margin: .75rem 0;
-  padding: .6rem .7rem;
-  border-radius: var(--r-sm);
-  background: var(--amber-bg);
-  color: var(--amber);
-  font-size: .74rem;
-  line-height: 1.55;
 }
 .bulk-template-link { margin-bottom: .75rem; }
 .bulk-upload-zone {
