@@ -183,7 +183,7 @@
         <!-- 岗位列表 -->
         <div v-else style="display:flex;flex-direction:column;gap:.35rem">
           <RouterLink v-for="j in jobs" :key="j.id" class="job-card" :to="'/job/'+j.id">
-            <div class="job-logo">{{ j.abbr }}</div>
+            <JobCategoryIcon :category="j.category" />
             <div style="flex:1;min-width:0">
               <div style="display:flex;align-items:center;gap:.45rem;margin-bottom:.25rem;flex-wrap:wrap">
                 <span class="job-title">{{ j.title }}</span>
@@ -221,6 +221,7 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import UserNavbar from '@/components/UserNavbar.vue'
 import AppToast from '@/components/AppToast.vue'
+import JobCategoryIcon from '@/components/JobCategoryIcon.vue'
 import { useToast } from '@/composables/useToast'
 import { readJson } from '@/lib/api'
 
@@ -423,7 +424,6 @@ const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize))
 
 function setSort(s) { sortBy.value = s; page.value = 1; loadJobs() }
 function goPage(n)  { page.value = n; loadJobs() }
-function abbrOf(n)  { return n ? n.charAt(0) : '职' }
 function fmtDate(s) { return s ? s.slice(5,10) : '' }
 
 const RECRUIT_BADGE = {
@@ -493,7 +493,7 @@ function mapJob(readJob) {
   const readRecruit = recruitLabel(readJob.recruitType)
   return {
     id: readJob.id,
-    abbr: abbrOf(readJob.companyName),
+    category: readJob.jobCategory || 'OTHER',
     title: readJob.positionName,
     company: readJob.companyName,
     city: readJob.workCity || '',

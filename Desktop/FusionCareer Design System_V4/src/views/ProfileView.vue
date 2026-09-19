@@ -136,7 +136,7 @@
                 >{{ t.label }}<span v-if="t.n" class="tab-count">{{ t.n }}</span></button>
               </div>
               <div v-for="a in filteredApps" :key="a.id" class="app-row" @click="openJobDetail(a)">
-                <div class="job-logo" style="width:36px;height:36px">{{ a.abbr }}</div>
+                <JobCategoryIcon :category="a.category" :size="36" />
                 <div style="flex:1;min-width:0">
                   <div style="display:flex;align-items:center;gap:.45rem">
                     <span style="font-size:.867rem;font-weight:600;color:var(--ink)">{{ a.title }}</span>
@@ -242,6 +242,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import UserNavbar from '@/components/UserNavbar.vue'
 import AppToast from '@/components/AppToast.vue'
+import JobCategoryIcon from '@/components/JobCategoryIcon.vue'
 import { useToast } from '@/composables/useToast'
 import { logoutUser, readUser } from '@/lib/auth'
 import { downloadFile as downloadBlob, readJson, uploadForm } from '@/lib/api'
@@ -435,7 +436,7 @@ async function loadApplications() {
     apps.value = readResult.list.map(readApplication => ({
       id: readApplication.id,
       jobPostId: readApplication.jobPostId,
-      abbr: readApplication.companyName?.charAt(0) || '职',
+      category: readApplication.jobCategory || 'OTHER',
       title: readApplication.positionName || '未知岗位',
       company: readApplication.companyName || '',
       deadline: readApplication.questionnaireDeadline || '',

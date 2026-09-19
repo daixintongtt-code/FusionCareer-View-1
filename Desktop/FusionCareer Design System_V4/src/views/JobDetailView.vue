@@ -16,7 +16,7 @@
           <!-- 公司头部 -->
           <div class="card card-p" style="margin-bottom:1rem">
             <div style="display:flex;align-items:center;gap:1rem">
-              <div class="job-logo" style="width:52px;height:52px;font-size:1.3rem">{{ abbr }}</div>
+              <JobCategoryIcon :category="job.jobCategory" :size="52" />
               <div>
                 <div style="font-size:1.15rem;font-weight:700;color:var(--ink);margin-bottom:.2rem">{{ job.positionName }}</div>
                 <div style="font-size:.867rem;color:var(--ink-2)">{{ job.companyName }}</div>
@@ -160,6 +160,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import UserNavbar from '@/components/UserNavbar.vue'
 import AppToast from '@/components/AppToast.vue'
+import JobCategoryIcon from '@/components/JobCategoryIcon.vue'
 import { useToast } from '@/composables/useToast'
 import { readJson } from '@/lib/api'
 import {
@@ -215,11 +216,6 @@ async function loadQuestions(jobPostId) {
     toast.error(readError?.message || '加载问卷失败')
   }
 }
-
-const abbr = computed(function() {
-  if (job.value && job.value.companyName) return job.value.companyName.charAt(0)
-  return '职'
-})
 
 const WORK_MODE_MAP = { ONLINE: '线上', OFFLINE: '线下', BOTH: '线上线下均可', HYBRID: '线上线下均可' }
 const EDU_MAP = {
