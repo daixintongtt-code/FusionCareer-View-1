@@ -187,7 +187,7 @@
             <div style="flex:1;min-width:0">
               <div style="display:flex;align-items:center;gap:.45rem;margin-bottom:.25rem;flex-wrap:wrap">
                 <span class="job-title">{{ j.title }}</span>
-                <span v-if="j.recruitBadge" :class="['badge', j.recruitBadge]">{{ j.recruit }}</span>
+                <span v-if="j.recruit" class="badge badge-gray">{{ j.recruit }}</span>
               </div>
               <div class="job-meta">
                 <span>{{ j.company }}</span>
@@ -426,10 +426,6 @@ function setSort(s) { sortBy.value = s; page.value = 1; loadJobs() }
 function goPage(n)  { page.value = n; loadJobs() }
 function fmtDate(s) { return s ? s.slice(5,10) : '' }
 
-const RECRUIT_BADGE = {
-  '大实习':'badge-blue', '小实习':'badge-green',
-  '日常实习':'badge-amber', '应届招聘':'badge-red',
-}
 function recruitLabel(t) {
   const m = {
     BIG_INTERNSHIP:'大实习', SMALL_INTERNSHIP:'小实习',
@@ -490,7 +486,6 @@ const SALARY_RANGE = {
 }
 
 function mapJob(readJob) {
-  const readRecruit = recruitLabel(readJob.recruitType)
   return {
     id: readJob.id,
     category: readJob.jobCategory || 'OTHER',
@@ -498,8 +493,7 @@ function mapJob(readJob) {
     company: readJob.companyName,
     city: readJob.workCity || '',
     jobtype: JOBTYPE_LABEL[readJob.jobCategory] || '',
-    recruit: readRecruit,
-    recruitBadge: RECRUIT_BADGE[readRecruit] || '',
+    recruit: recruitLabel(readJob.recruitType),
     l2tags: [
       readJob.workPeriodType ? DURATION_DISPLAY[readJob.workPeriodType] : null,
       readJob.workDurationType ? DAYS_DISPLAY[readJob.workDurationType] : null,
@@ -773,7 +767,6 @@ onMounted(() => Promise.all([loadJobs(), loadRecommendations()]))
 .job-card:hover { box-shadow:var(--shadow-md); border-color:var(--border-mid); transform:translateY(-1px); }
 .job-logo {
   width:36px; height:36px; border-radius:var(--r-md); flex-shrink:0;
-  background:var(--red-light); color:var(--red);
   font-size:var(--fs-xl); font-weight:700; font-family:var(--font-serif);
   display:flex; align-items:center; justify-content:center;
 }

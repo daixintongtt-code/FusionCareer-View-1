@@ -367,7 +367,7 @@ select.form-control {
 .home-layout { display: grid; grid-template-columns: 1fr 270px; gap: 1.5rem; align-items: start; }
 
 /* ── Carousel ── */
-.carousel-wrap   { overflow: hidden; }
+.carousel-wrap   { overflow: hidden; padding: 6px; margin: -6px; }
 .carousel-track  { display: flex; gap: 0.875rem; transition: transform 0.35s ease; }
 .carousel-card {
   min-width: 196px; max-width: 196px; background: var(--bg-soft);
@@ -415,4 +415,3 @@ select.form-control {
 }
 .fp:hover { border-color: var(--border-mid); }
 .fp.active { background: var(--red-light); border-color: var(--red-border); color: var(--red); }
-

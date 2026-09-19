@@ -62,10 +62,10 @@ const iconStyle = computed(() => {
 </script>
 
 <style scoped>
-.job-category-icon {
-  color: #7f1d2d;
-  background: #fff4f4;
-  border-color: rgba(127, 29, 45, .16);
+.job-logo.job-category-icon {
+  color: var(--ink-2);
+  background: var(--bg-soft);
+  border-color: var(--border);
 }
 .job-category-icon svg {
   width: 58%;
@@ -78,9 +78,4 @@ const iconStyle = computed(() => {
 }
 .job-category-icon--media svg,
 .job-category-icon--government svg { stroke-width: 2; }
-.job-category-icon.job-category-icon--media { color: #9f1239; background: #fff1f2; }
-.job-category-icon.job-category-icon--enterprise { color: #1d4ed8; background: #eff6ff; border-color: #dbeafe; }
-.job-category-icon.job-category-icon--government { color: #b45309; background: #fffbeb; border-color: #fde68a; }
-.job-category-icon.job-category-icon--academic { color: #6d28d9; background: #f5f3ff; border-color: #e9d5ff; }
-.job-category-icon.job-category-icon--other { color: #475569; background: #f8fafc; border-color: #e2e8f0; }
 </style>
