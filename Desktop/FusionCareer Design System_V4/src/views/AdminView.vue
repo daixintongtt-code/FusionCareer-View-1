@@ -240,12 +240,22 @@
                 <p>已识别 {{ structuredJobs.length }} 个岗位，结果不会自动保存或发布。</p>
               </div>
             </div>
-            <div v-if="structuredJobs.length>1" style="display:flex;gap:.4rem;margin-top:.75rem;flex-wrap:wrap">
-              <button v-for="(readJob,readIndex) in structuredJobs" :key="readIndex"
-                :class="['btn','btn-sm',structuredIndex===readIndex?'btn-primary':'btn-secondary']"
-                @click="selectJob(readIndex)">
-                {{ readJob.positionName || `岗位 ${readIndex + 1}` }}
-              </button>
+            <div v-if="structuredJobs.length" class="structured-job-list" aria-label="待处理岗位">
+              <div v-for="(readJob,readIndex) in structuredJobs" :key="readJob._selectionId" class="structured-job-option">
+                <button type="button"
+                  :class="['structured-job-select', structuredIndex===readIndex&&'active']"
+                  @click="selectJob(readIndex)">
+                  <span>岗位 {{ readIndex + 1 }}</span>
+                  <strong>{{ readJob.positionName || '未命名岗位' }}</strong>
+                  <small>{{ readJob.companyName || '公司待补充' }}</small>
+                </button>
+                <button type="button" class="structured-job-remove"
+                  :aria-label="`删除${readJob.positionName || `岗位 ${readIndex + 1}`}`"
+                  title="从识别结果中删除"
+                  @click="removeStructuredJob(readIndex)">
+                  <i class="ti ti-x" />
+                </button>
+              </div>
             </div>
             <div v-if="structureWarnings.length" style="font-size:.75rem;color:var(--gold-dark);margin-top:.75rem">
               <div v-for="(readWarning,readIndex) in structureWarnings" :key="readIndex">
@@ -1611,8 +1621,9 @@ async function structureJob() {
     const readResult = await readJson('/admin/job-post/structure', {
       method:'POST', body:JSON.stringify({ text:jobText.value }),
     })
-    structuredJobs.value = (readResult?.jobs || []).map(readJob => ({
+    structuredJobs.value = (readResult?.jobs || []).map((readJob, readIndex) => ({
       ...NJ_INIT(), ...normalizeJobRequirements(readJob), questions:[],
+      _selectionId: `${Date.now()}-${readIndex}`,
     }))
     structureWarnings.value = readResult?.warnings || []
     if (!structuredJobs.value.length) {
@@ -1632,12 +1643,49 @@ async function structureJob() {
 }
 
 function selectJob(readIndex) {
+  if (readIndex < 0 || readIndex >= structuredJobs.value.length || readIndex === structuredIndex.value) return
   if (structuredIndex.value >= 0) {
     structuredJobs.value[structuredIndex.value] = { ...nj.value }
   }
   structuredIndex.value = readIndex
   const readJob = structuredJobs.value[readIndex]
   nj.value = { ...NJ_INIT(), ...normalizeJobRequirements(readJob), questions:readJob.questions || [] }
+  deliveryMode.value = readJob.sourceUrl ? 'external' : 'internal'
+  cityDraft.value = ''
+}
+
+function removeStructuredJob(readIndex) {
+  if (readIndex < 0 || readIndex >= structuredJobs.value.length) return
+  const readName = structuredJobs.value[readIndex].positionName || `岗位 ${readIndex + 1}`
+  if (structuredIndex.value >= 0) {
+    structuredJobs.value[structuredIndex.value] = { ...nj.value }
+  }
+  const readSelected = structuredIndex.value
+  structuredJobs.value.splice(readIndex, 1)
+  if (!structuredJobs.value.length) {
+    structuredIndex.value = -1
+    nj.value = NJ_INIT()
+    deliveryMode.value = 'internal'
+    cityDraft.value = ''
+  } else if (readIndex === readSelected) {
+    structuredIndex.value = -1
+    selectJob(Math.min(readIndex, structuredJobs.value.length - 1))
+  } else if (readIndex < readSelected) {
+    structuredIndex.value = readSelected - 1
+  }
+  toast.success(`已移除「${readName}」`)
+}
+
+function finishStructuredJob(readIndex) {
+  structuredJobs.value.splice(readIndex, 1)
+  if (!structuredJobs.value.length) {
+    v.value = 'list'
+    resetForm()
+    return
+  }
+  structuredIndex.value = -1
+  editingId.value = null
+  selectJob(Math.min(readIndex, structuredJobs.value.length - 1))
 }
 
 function openCreate() {
@@ -1690,6 +1738,7 @@ async function publishJob() {
 
 async function saveJob(updateStatus) {
   try {
+    const readStructuredIndex = structuredIndex.value
     let readJobId = editingId.value
     if (readJobId) {
       await readJson(`/admin/job-post/${readJobId}`, {
@@ -1715,8 +1764,12 @@ async function saveJob(updateStatus) {
       })
     }
     await loadJobs()
-    v.value = 'list'
-    resetForm()
+    if (readStructuredIndex >= 0) {
+      finishStructuredJob(readStructuredIndex)
+    } else {
+      v.value = 'list'
+      resetForm()
+    }
     return true
   } catch (readError) {
     toast.error(readError?.message || '保存岗位失败')
@@ -1986,6 +2039,29 @@ async function exportData() {
 .smart-result > i { font-size: 1rem; margin-top: .05rem; flex-shrink: 0; }
 .smart-result strong { display: block; font-size: .8rem; }
 .smart-result p { font-size: .72rem; line-height: 1.55; margin-top: .16rem; color: #4e725a; }
+.structured-job-list {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .55rem; margin-top: .75rem;
+}
+.structured-job-option { position: relative; min-width: 0; }
+.structured-job-select {
+  width: 100%; min-height: 72px; padding: .58rem 2.1rem .58rem .7rem;
+  text-align: left; border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--bg-card); color: var(--ink); cursor: pointer;
+  display: flex; flex-direction: column; align-items: flex-start; gap: .12rem;
+}
+.structured-job-select:hover { border-color: var(--red-border); background: var(--red-light); }
+.structured-job-select.active { border-color: var(--red); background: var(--red-light); box-shadow: 0 0 0 1px rgba(157,31,48,.08); }
+.structured-job-select span { font-size: .66rem; color: var(--ink-3); }
+.structured-job-select strong { width: 100%; font-size: .78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.structured-job-select small { width: 100%; font-size: .68rem; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.structured-job-remove {
+  position: absolute; top: .38rem; right: .38rem; z-index: 1;
+  width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ink-3); background: transparent; cursor: pointer;
+}
+.structured-job-remove:hover { color: #fff; background: var(--red); }
 .bulk-import-intro {
   display: grid; gap: .4rem; margin: 1rem 0 .75rem;
   color: var(--ink-2); font-size: .78rem;
@@ -2344,6 +2420,7 @@ async function exportData() {
   .bulk-import-actions .btn { width: 100%; justify-content: center; }
   .smart-parse-btn { width: 100%; }
   .smart-source-input { min-height: 210px; }
+  .structured-job-list { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 1120px) {
