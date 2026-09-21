@@ -19,7 +19,12 @@ const router = createRouter({
 
 async function guardRoute(readRoute) {
   if (!readRoute.meta.requiresAuth && readRoute.path !== '/login') return true
-  if (!readToken()) return readRoute.meta.requiresAuth ? '/login' : true
+  if (!readToken()) {
+    if (!readRoute.meta.requiresAuth) return true
+    return readRoute.path === '/admin'
+      ? { path: '/login', query: { target: 'admin' } }
+      : '/login'
+  }
   try {
     const readCurrentUser = await readUser()
     if (readRoute.path === '/login') {

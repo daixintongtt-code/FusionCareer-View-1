@@ -23,7 +23,7 @@
           </div>
         </div>
 
-        <button class="btn-primary btn-red" @click="loginUser('NORMAL')">
+        <button class="btn-primary btn-red" @click="loginUser(route.query.target === 'admin' ? 'ADMIN' : 'NORMAL')">
           <i class="ti ti-external-link" />
           <span>{{ isDev ? '本地学生登录' : '前往 UIS 登录' }}</span>
         </button>
@@ -71,10 +71,12 @@
 
 <script setup>
 import { ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { loginUser } from '@/lib/auth'
 
 const showAdminModal = ref(false)
 const isDev = import.meta.env.DEV
+const route = useRoute()
 </script>
 
 <style scoped>

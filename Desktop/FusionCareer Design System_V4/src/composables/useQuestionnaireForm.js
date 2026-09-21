@@ -1,4 +1,6 @@
 import { readJson, uploadForm } from '@/lib/api'
+import { apiId, buildSubmitBody } from '@/lib/questionnairePayload.mjs'
+export { buildAnswersJson } from '@/lib/questionnairePayload.mjs'
 
 /** 与后端 upload.allowed-extensions 一致 */
 export const ALLOWED_UPLOAD_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png']
@@ -36,7 +38,7 @@ export function normQuestions(list) {
     .slice()
     .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
     .map((q) => ({
-      id: q.id,
+      id: apiId(q.id),
       title: q.title,
       type: q.questionType,
       required: !!q.required,
@@ -54,7 +56,7 @@ export function resumeFileIconByName(name) {
 
 export function mapResumeFilesForPicker(files) {
   return (files || []).map((f) => ({
-    id: f.id,
+    id: apiId(f.id),
     name: f.originalName,
     icon: resumeFileIconByName(f.originalName),
   }))
@@ -109,11 +111,11 @@ export function applyParsedToDetailForm(questions, answersJson, resumeFiles, ans
   }
   if (!Array.isArray(arr)) return
 
-  const byId = new Map(questions.map((q) => [q.id, q]))
+  const byId = new Map(questions.map((q) => [apiId(q.id), q]))
   const fileList = resumeFiles || []
 
   for (const row of arr) {
-    const qid = row.questionId
+    const qid = apiId(row.questionId)
     const q = byId.get(qid)
     const raw = row.value
     if (!q) continue
@@ -122,7 +124,7 @@ export function applyParsedToDetailForm(questions, answersJson, resumeFiles, ans
       if (!sid) continue
       const fromList = fileList.find((f) => String(f.id) === sid)
       fileAnswers[qid] = {
-        id: Number(sid),
+        id: apiId(sid),
         name: fromList?.originalName || `文件 #${sid}`,
       }
     } else if (q.type === 'CHECKBOX') {
@@ -147,11 +149,11 @@ export function applyParsedToProfileForm(questions, answersJson, resumeFiles, ed
   }
   if (!Array.isArray(arr)) return
 
-  const byId = new Map(questions.map((q) => [q.id, q]))
+  const byId = new Map(questions.map((q) => [apiId(q.id), q]))
   const fileList = resumeFiles || []
 
   for (const row of arr) {
-    const qid = row.questionId
+    const qid = apiId(row.questionId)
     const q = byId.get(qid)
     const raw = row.value
     if (!q) continue
@@ -161,7 +163,7 @@ export function applyParsedToProfileForm(questions, answersJson, resumeFiles, ed
       const fromList = fileList.find((f) => String(f.id) === sid)
       const displayName = fromList?.originalName || `文件 #${sid}`
       editAnswers[qid] = displayName
-      fileIds[qid] = Number(sid)
+      fileIds[qid] = apiId(sid)
     } else if (q.type === 'CHECKBOX') {
       const parts =
         typeof raw === 'string' ? raw.split(',').map((s) => s.trim()).filter(Boolean) : []
@@ -188,31 +190,6 @@ export function validateRequiredAnswers(questions, textAnswers, fileAnswersOrIds
     }
   }
   return null
-}
-
-/** fileAnswersOrIds: 详情页 {id,name} 或 Profile fileIds 数字 */
-export function buildAnswersJson(questions, textAnswers, fileAnswersOrIds) {
-  const rows = []
-  for (const q of questions) {
-    if (q.type === 'FILE_UPLOAD') {
-      const fa = fileAnswersOrIds[q.id]
-      const id = typeof fa === 'object' && fa != null ? fa.id : fa
-      rows.push({ questionId: q.id, value: id == null ? '' : String(id) })
-    } else if (q.type === 'CHECKBOX') {
-      const arr = textAnswers[q.id] || []
-      rows.push({ questionId: q.id, value: arr.join(',') })
-    } else {
-      rows.push({ questionId: q.id, value: String(textAnswers[q.id] ?? '') })
-    }
-  }
-  return JSON.stringify(rows)
-}
-
-function buildSubmitBody(jobPostId, questions, textAnswers, fileAnswersOrIds) {
-  return {
-    jobPostId: Number(jobPostId),
-    answers: buildAnswersJson(questions, textAnswers, fileAnswersOrIds),
-  }
 }
 
 export async function submitQuestionnaire(jobPostId, questions, textAnswers, fileAnswersOrIds) {

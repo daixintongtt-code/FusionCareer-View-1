@@ -30,7 +30,8 @@
               <div v-if="job.workCity" class="info-item"><i class="ti ti-map-pin"></i>{{ job.workCity }}</div>
               <div v-if="job.salaryDisplay" class="info-item"><i class="ti ti-coin"></i>{{ job.salaryDisplay }}</div>
               <div v-if="job.workMode" class="info-item"><i class="ti ti-building"></i>{{ workModeLabel }}</div>
-              <div v-if="job.workEndDate" class="info-item"><i class="ti ti-calendar-due"></i>截止 {{ job.workEndDate.slice(0,10) }}</div>
+              <div v-if="job.applicationDeadline" class="info-item"><i class="ti ti-calendar-due"></i>投递截止 {{ job.applicationDeadline.slice(0,10) }}</div>
+              <div v-if="job.workStartDate || job.workEndDate" class="info-item"><i class="ti ti-calendar"></i>工作时间 {{ [job.workStartDate, job.workEndDate].filter(Boolean).map(value => value.slice(0,10)).join(' 至 ') }}</div>
               <div v-if="job.recruitType" class="info-item"><i class="ti ti-users"></i>{{ recruitLabel }}</div>
             </div>
             <div class="divider"></div>
@@ -59,7 +60,7 @@
             </div>
             <div style="font-size:.773rem;color:var(--ink-2);margin-bottom:1rem;display:flex;align-items:center;gap:.4rem">
               <i class="ti ti-calendar-due" style="color:var(--ink-3)"></i>
-              截止日期：{{ job.workEndDate ? job.workEndDate.slice(0,10) : '未设置' }}
+              投递截止：{{ job.applicationDeadline ? job.applicationDeadline.slice(0,10) : '未设置' }}
             </div>
             <!-- 外部投递 -->
             <template v-if="job.sourceUrl">
@@ -194,7 +195,7 @@ async function loadMyResumes() {
   try {
     const readFiles = await loadResumeFileList()
     myResumes.value = readFiles.map(readFile => ({
-      id: readFile.id,
+      id: String(readFile.id),
       name: readFile.originalName,
       icon: resumeFileIconByName(readFile.originalName),
     }))
@@ -270,7 +271,7 @@ async function handleFile(readQuestionId, readEvent) {
   }
   try {
     const readResult = await uploadQuestionnaireFile(readFile)
-    fileAnswers.value[readQuestionId] = { id:readResult.id, name:readResult.originalName }
+    fileAnswers.value[readQuestionId] = { id:String(readResult.id), name:readResult.originalName }
     await loadMyResumes()
     toast.success('附件上传成功')
   } catch (uploadError) {

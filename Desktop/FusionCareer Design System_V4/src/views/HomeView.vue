@@ -217,7 +217,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import UserNavbar from '@/components/UserNavbar.vue'
 import AppToast from '@/components/AppToast.vue'
@@ -500,7 +500,7 @@ function mapJob(readJob) {
       readJob.salaryDisplay,
       workModeLabel(readJob.workMode),
     ].filter(Boolean),
-    dl: fmtDate(readJob.workEndDate),
+    dl: fmtDate(readJob.applicationDeadline),
   }
 }
 
@@ -552,7 +552,12 @@ async function loadRecommendations() {
   }
 }
 
-onMounted(() => Promise.all([loadJobs(), loadRecommendations()]))
+onMounted(() => {
+  loadJobs()
+  loadRecommendations()
+  window.addEventListener('focus', loadRecommendations)
+})
+onUnmounted(() => window.removeEventListener('focus', loadRecommendations))
 </script>
 
 <style scoped>

@@ -32,6 +32,7 @@
         <button :class="['sidebar-link', v==='list'&&'active']" @click="v='list'"><i class="ti ti-list" />岗位列表</button>
         <button :class="['sidebar-link', v==='create'&&'active']" @click="openCreate"><i class="ti ti-plus" />新建岗位</button>
         <button :class="['sidebar-link', v==='drafts'&&'active']" @click="v='drafts'"><i class="ti ti-inbox" />草稿箱<span v-if="draftCount>0" class="sidebar-badge">{{ draftCount }}</span></button>
+        <button :class="['sidebar-link', v==='recycle'&&'active']" @click="showRecycleBin"><i class="ti ti-recycle" />回收站</button>
         <button :class="['sidebar-link', v==='resumes'&&'active']" @click="v='resumes'"><i class="ti ti-file-text" />简历管理</button>
         <template v-if="isSuperAdmin">
           <div class="sidebar-label">系统管理</div>
@@ -134,10 +135,11 @@
 
           <!-- 工具栏 -->
           <div style="display:flex;align-items:center;gap:.625rem;margin-bottom:1.1rem;flex-wrap:wrap">
-            <input class="form-control" style="flex:1;min-width:180px;padding:.5rem .875rem" v-model="sk" placeholder="搜索岗位名称、公司..." />
+            <input class="form-control" style="flex:1;min-width:180px;padding:.5rem .875rem" v-model="sk" placeholder="搜索岗位名称、公司..." @keyup.enter="searchAdminJobs" />
             <select class="form-control" style="min-width:110px;padding:.5rem .875rem" v-model="sf">
-              <option value="">全部状态</option><option value="PUBLISHED">发布中</option><option value="OFFLINE">未发布</option><option value="EXPIRED">已截止</option>
+              <option value="">全部状态</option><option value="PUBLISHED">发布中</option><option value="RECOMMENDED">推荐中</option><option value="OFFLINE">未发布</option><option value="EXPIRED">已截止</option>
             </select>
+            <button class="btn btn-secondary btn-sm" @click="searchAdminJobs"><i class="ti ti-search" />搜索</button>
           </div>
 
           <!-- 批量操作栏 -->
@@ -156,7 +158,7 @@
               <thead>
                 <tr>
                   <th class="col-check"><input type="checkbox" :checked="filteredJobs.length>0 && filteredJobs.every(j=>selected.includes(j.id))" @change="e=>toggleAll(e.target.checked)" /></th>
-                  <th>岗位名称</th><th>公司</th><th>城市</th><th>截止</th><th>状态</th><th>投递数</th><th>推荐</th><th>操作</th>
+                  <th>岗位名称</th><th>公司</th><th>城市</th><th>投递截止</th><th>状态</th><th>投递数</th><th>推荐</th><th>操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -165,7 +167,7 @@
                   <td><span style="font-weight:500;cursor:pointer;color:var(--ink)" @click="openEdit(j)">{{ j.positionName }}</span></td>
                   <td>{{ j.companyName }}</td>
                   <td>{{ j.workCity }}</td>
-                  <td>{{ j.workEndDate }}</td>
+                  <td>{{ j.applicationDeadline || '—' }}</td>
                   <td><span :class="['badge', STATUS_CLASS[j.status]]">{{ STATUS_LABEL[j.status] }}</span></td>
                   <td>
                     <span v-if="j.sourceUrl" class="badge badge-gray" style="font-size:.72rem;gap:3px"><i class="ti ti-external-link" style="font-size:9px" />外部投递</span>
@@ -177,7 +179,7 @@
                       <div class="tbl-btn" @click="openEdit(j)"><span class="tbl-tip">编辑</span><i class="ti ti-edit" /></div>
                       <div v-if="j.status==='OFFLINE'" class="tbl-btn approve" @click="publish(j)"><span class="tbl-tip">发布上线</span><i class="ti ti-send" /></div>
                       <div v-else-if="j.status==='PUBLISHED'" class="tbl-btn" @click="unpublishJob(j)"><span class="tbl-tip">停止发布</span><i class="ti ti-send-off" /></div>
-                      <div v-if="j.status!=='OFFLINE'" class="tbl-btn" @click="goJobResumes(j)"><span class="tbl-tip">查看简历</span><i class="ti ti-file-text" /></div>
+                      <div v-if="j.status!=='OFFLINE' && !j.sourceUrl" class="tbl-btn" @click="goJobResumes(j)"><span class="tbl-tip">查看简历</span><i class="ti ti-file-text" /></div>
                     </div>
                   </td>
                 </tr>
@@ -185,7 +187,14 @@
             </table>
           </div>
           <div class="pagination" style="margin-top:.875rem">
-            <span style="font-size:.773rem;color:var(--ink-3);margin-right:auto">当前显示 {{ jobs.length }} 条</span>
+            <span style="font-size:.773rem;color:var(--ink-3);margin-right:auto">
+              {{ sf === 'RECOMMENDED' ? `共 ${recommendedTotal} 条推荐岗位` : `当前显示 ${filteredJobs.length} 条` }}
+            </span>
+            <template v-if="sf === 'RECOMMENDED'">
+              <button class="page-btn" :disabled="recommendedPage<=1" @click="changeRecommendedPage(recommendedPage-1)"><i class="ti ti-chevron-left" /></button>
+              <span>第 {{ recommendedPage }} / {{ recommendedPages }} 页</span>
+              <button class="page-btn" :disabled="recommendedPage>=recommendedPages" @click="changeRecommendedPage(recommendedPage+1)"><i class="ti ti-chevron-right" /></button>
+            </template>
           </div>
         </div>
 
@@ -305,6 +314,9 @@
               <div class="form-group"><label class="form-label">招聘人数</label>
                 <input class="form-control" type="number" min="1" v-model.number="nj.headcount" placeholder="若干" />
               </div>
+              <div class="form-group"><label class="form-label">投递截止日期</label>
+                <input class="form-control" type="date" v-model="nj.applicationDeadline" />
+              </div>
               <div class="form-group"><label class="form-label">岗位大类 <span class="req">*</span></label>
                 <select class="form-control" v-model="nj.jobCategory" @change="nj.jobSubCategory=''">
                   <option value="">请选择</option>
@@ -374,7 +386,7 @@
               <div class="form-group"><label class="form-label">开始日期</label>
                 <input class="form-control" type="date" v-model="nj.workStartDate" />
               </div>
-              <div class="form-group"><label class="form-label">截止日期</label>
+              <div class="form-group"><label class="form-label">工作结束日期</label>
                 <input class="form-control" type="date" v-model="nj.workEndDate" />
               </div>
               <div class="form-group"><label class="form-label">工作省份</label>
@@ -429,7 +441,7 @@
           <div class="card card-p" style="margin-bottom:1rem">
             <div class="form-section-title">岗位详情</div>
             <div class="grid-2">
-              <div class="form-group span-2"><label class="form-label">岗位描述 <span class="req">*</span></label>
+              <div class="form-group span-2"><label class="form-label">岗位描述</label>
                 <textarea class="form-control" style="min-height:120px" v-model="nj.jobDesc" placeholder="描述岗位职责、日常工作内容等..." />
               </div>
               <div class="form-group"><label class="form-label">专业要求</label>
@@ -583,7 +595,7 @@
                 <thead>
                   <tr>
                     <th class="col-check"><input type="checkbox" :checked="draftJobs.length>0 && draftJobs.every(j=>draftSelected.includes(j.id))" @change="e=>draftToggleAll(e.target.checked)" /></th>
-                    <th>岗位名称</th><th>公司</th><th>城市</th><th>截止</th><th>来源</th><th>操作</th>
+                    <th>岗位名称</th><th>公司</th><th>城市</th><th>投递截止</th><th>来源</th><th>操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -592,7 +604,7 @@
                     <td><span style="font-weight:500;color:var(--ink)">{{ j.positionName }}</span></td>
                     <td>{{ j.companyName }}</td>
                     <td>{{ j.workCity }}</td>
-                    <td>{{ j.workEndDate || '—' }}</td>
+                    <td>{{ j.applicationDeadline || '—' }}</td>
                     <td>
                       <span v-if="j.sourceType==='CRAWL'" class="badge" style="background:var(--blue-bg,#eaf0fb);color:var(--blue,#1b4f9c);gap:3px;font-size:.7rem"><i class="ti ti-robot" style="font-size:9px" />自动导入</span>
                       <span v-else-if="['EXCEL','IMPORT','BATCH_IMPORT'].includes(j.sourceType)" class="badge badge-gold" style="font-size:.7rem"><i class="ti ti-file-spreadsheet" />表格导入</span>
@@ -608,6 +620,46 @@
                   </tr>
                 </tbody>
               </table>
+            </div>
+          </template>
+        </div>
+
+        <!-- ───── 岗位回收站 ───── -->
+        <div v-if="v==='recycle'">
+          <div class="page-hd"><h1><i class="ti ti-recycle" />岗位回收站</h1></div>
+          <div style="display:flex;align-items:center;gap:.625rem;margin-bottom:1.1rem">
+            <input class="form-control" style="flex:1;padding:.5rem .875rem" v-model="recycleKeyword"
+              placeholder="搜索岗位名称、公司..." @keyup.enter="searchRecycleBin" />
+            <button class="btn btn-secondary btn-sm" @click="searchRecycleBin"><i class="ti ti-search" />搜索</button>
+          </div>
+          <div v-if="recycleLoading" class="card table-state">回收站加载中…</div>
+          <div v-else-if="recycleError" class="card table-state" role="alert">
+            <div>{{ recycleError }}</div>
+            <button class="btn btn-secondary btn-sm" @click="loadRecycleBin">重新加载</button>
+          </div>
+          <div v-else-if="!recycleJobs.length" class="card table-state">回收站为空</div>
+          <template v-else>
+            <div class="card" style="overflow:auto">
+              <table class="data-table">
+                <thead><tr><th>岗位名称</th><th>公司</th><th>投递截止</th><th>回收原因</th><th>回收时间</th><th>操作</th></tr></thead>
+                <tbody>
+                  <tr v-for="readJob in recycleJobs" :key="readJob.id">
+                    <td>{{ readJob.positionName }}</td>
+                    <td>{{ readJob.companyName }}</td>
+                    <td>{{ readJob.applicationDeadline || '—' }}</td>
+                    <td>{{ readJob.recycleReason || '—' }}</td>
+                    <td>{{ readJob.recycledAt?.replace('T', ' ').slice(0, 16) || '—' }}</td>
+                    <td><button class="btn btn-secondary btn-sm" :disabled="restoringJobId===readJob.id"
+                      @click="restoreJob(readJob)"><i class="ti ti-restore" />恢复为草稿</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="pagination" style="margin-top:.875rem">
+              <span style="margin-right:auto">共 {{ recycleTotal }} 条</span>
+              <button class="page-btn" :disabled="recyclePage<=1" @click="changeRecyclePage(recyclePage-1)"><i class="ti ti-chevron-left" /></button>
+              <span>第 {{ recyclePage }} / {{ recyclePages }} 页</span>
+              <button class="page-btn" :disabled="recyclePage>=recyclePages" @click="changeRecyclePage(recyclePage+1)"><i class="ti ti-chevron-right" /></button>
             </div>
           </template>
         </div>
@@ -903,7 +955,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import AppToast from '@/components/AppToast.vue'
 import { useToast } from '@/composables/useToast'
 import { logoutUser, readUser } from '@/lib/auth'
@@ -1164,6 +1216,18 @@ function cancelConfirm() { show_confirm.value = false }
 
 
 const jobs = ref([])
+const recommendedJobs = ref([])
+const recommendedPage = ref(1)
+const recommendedPages = ref(1)
+const recommendedTotal = ref(0)
+const recycleJobs = ref([])
+const recycleKeyword = ref('')
+const recyclePage = ref(1)
+const recyclePages = ref(1)
+const recycleTotal = ref(0)
+const recycleLoading = ref(false)
+const recycleError = ref('')
+const restoringJobId = ref(null)
 const STATUS_LABEL = { PUBLISHED:'发布中', OFFLINE:'未发布', EXPIRED:'已截止' }
 const STATUS_CLASS = { PUBLISHED:'badge-green', OFFLINE:'badge-gray', EXPIRED:'badge-amber' }
 const STATUS_ORDER = { PUBLISHED:0, OFFLINE:1, EXPIRED:2 }
@@ -1182,11 +1246,113 @@ async function loadJobs() {
   }
 }
 
+async function loadRecommendedJobs() {
+  try {
+    const readParams = new URLSearchParams({
+      page: String(recommendedPage.value), size: '20', status: 'PUBLISHED', recommended: 'true',
+    })
+    if (sk.value.trim()) readParams.set('keyword', sk.value.trim())
+    const readPage = await readJson(`/admin/job-post/list?${readParams}`)
+    const readPages = Math.max(1, Number(readPage?.totalPages || 1))
+    if (recommendedPage.value > readPages) {
+      recommendedPage.value = readPages
+      return loadRecommendedJobs()
+    }
+    recommendedJobs.value = (readPage?.list || []).map(readJob => ({
+      ...readJob,
+      apps: readJob.applicationCount ?? 0,
+      publishedAt: (readJob.createdAt || '').slice(0, 10),
+    }))
+    recommendedTotal.value = Number(readPage?.total || 0)
+    recommendedPages.value = readPages
+  } catch (readError) {
+    recommendedJobs.value = []
+    recommendedTotal.value = 0
+    toast.error(readError?.message || '加载推荐岗位失败')
+  }
+}
+
+function searchAdminJobs() {
+  if (sf.value !== 'RECOMMENDED') return
+  recommendedPage.value = 1
+  loadRecommendedJobs()
+}
+
+function changeRecommendedPage(readPage) {
+  if (readPage < 1 || readPage > recommendedPages.value || readPage === recommendedPage.value) return
+  recommendedPage.value = readPage
+  selected.value = []
+  loadRecommendedJobs()
+}
+
+watch(sf, readStatus => {
+  selected.value = []
+  if (readStatus === 'RECOMMENDED') {
+    recommendedPage.value = 1
+    loadRecommendedJobs()
+  }
+})
+
+async function loadRecycleBin() {
+  recycleLoading.value = true
+  recycleError.value = ''
+  try {
+    const readParams = new URLSearchParams({
+      page: String(recyclePage.value), size: '20', status: 'RECYCLED',
+    })
+    if (recycleKeyword.value.trim()) readParams.set('keyword', recycleKeyword.value.trim())
+    const readPage = await readJson(`/admin/job-post/list?${readParams}`)
+    const readPages = Math.max(1, Number(readPage?.totalPages || 1))
+    if (recyclePage.value > readPages) {
+      recyclePage.value = readPages
+      return loadRecycleBin()
+    }
+    recycleJobs.value = readPage?.list || []
+    recycleTotal.value = Number(readPage?.total || 0)
+    recyclePages.value = readPages
+  } catch (readError) {
+    recycleJobs.value = []
+    recycleError.value = readError?.message || '回收站加载失败'
+  } finally {
+    recycleLoading.value = false
+  }
+}
+
+function showRecycleBin() {
+  v.value = 'recycle'
+  loadRecycleBin()
+}
+
+function searchRecycleBin() {
+  recyclePage.value = 1
+  loadRecycleBin()
+}
+
+function changeRecyclePage(readPage) {
+  if (readPage < 1 || readPage > recyclePages.value || readPage === recyclePage.value) return
+  recyclePage.value = readPage
+  loadRecycleBin()
+}
+
+async function restoreJob(readJob) {
+  if (restoringJobId.value != null) return
+  restoringJobId.value = readJob.id
+  try {
+    await readJson(`/admin/job-post/${readJob.id}/restore`, { method: 'PUT' })
+    toast.success('已恢复为草稿')
+    await Promise.all([loadJobs(), loadRecycleBin()])
+  } catch (readError) {
+    toast.error(readError?.message || '恢复失败')
+  } finally {
+    restoringJobId.value = null
+  }
+}
+
 function buildJobRequest(readJob, updateStatus = readJob.status) {
   const readKeys = [
     'sourceType', 'sourceUrl', 'companyName', 'department', 'positionName',
     'jobCategory', 'jobSubCategory', 'recruitType', 'headcount',
-    'workStartDate', 'workEndDate', 'workDaysPerWeek', 'workDurationType',
+    'workStartDate', 'workEndDate', 'applicationDeadline', 'workDaysPerWeek', 'workDurationType',
     'workPeriodType', 'workMode', 'workCity', 'workProvince', 'workLocation',
     'salaryMin', 'salaryMax', 'salaryDisplay', 'jobDesc', 'reqEduLevel',
     'reqMajor', 'reqGradYear', 'reqSkills', 'reqOther', 'recommended',
@@ -1198,10 +1364,12 @@ function buildJobRequest(readJob, updateStatus = readJob.status) {
   return createRequest
 }
 const filteredJobs = computed(() =>
-  jobs.value
+  (sf.value === 'RECOMMENDED' ? recommendedJobs.value : jobs.value)
     .filter(j =>
       (!sk.value || j.positionName.includes(sk.value) || j.companyName.includes(sk.value)) &&
-      (!sf.value || j.status === sf.value)
+      (!sf.value || (sf.value === 'RECOMMENDED'
+        ? j.status === 'PUBLISHED' && j.recommended
+        : j.status === sf.value))
     )
     .slice()
     .sort((a, b) => {
@@ -1219,6 +1387,7 @@ function toggleSel(id) { selected.value.includes(id) ? selected.value = selected
 async function toggleRec(updateJob) {
   const updateRecommended = !updateJob.recommended
   await updateJobPost(updateJob, { recommended:updateRecommended })
+  if (sf.value === 'RECOMMENDED') await loadRecommendedJobs()
   toast.success(updateRecommended ? '已设为推荐' : '已取消推荐')
 }
 async function publish(updateJob) {
@@ -1240,8 +1409,10 @@ async function updateJobPost(updateJob, updateFields) {
 
 // 批量操作
 const publishableCount = computed(() => selected.value.filter(id => jobs.value.find(j=>j.id===id)?.status === 'OFFLINE').length)
-const offlinableCount  = computed(() => selected.value.filter(id => jobs.value.find(j=>j.id===id)?.status === 'PUBLISHED').length)
-const recableCount = computed(() => selected.value.filter(id => jobs.value.find(j=>j.id===id)?.status === 'PUBLISHED').length)
+const offlinableCount  = computed(() => selected.value.filter(id =>
+  [...jobs.value, ...recommendedJobs.value].find(j => j.id === id)?.status === 'PUBLISHED').length)
+const recableCount = computed(() => selected.value.filter(id =>
+  [...jobs.value, ...recommendedJobs.value].find(j => j.id === id)?.status === 'PUBLISHED').length)
 
 async function bulkPublish() {
   const n = publishableCount.value
@@ -1255,8 +1426,10 @@ async function bulkPublish() {
 }
 async function bulkRec(updateRecommended) {
   const n = selected.value.length
-  const updateJobs = jobs.value.filter(readJob => selected.value.includes(readJob.id))
+  const updateJobs = (sf.value === 'RECOMMENDED' ? recommendedJobs.value : jobs.value)
+    .filter(readJob => selected.value.includes(readJob.id))
   await Promise.all(updateJobs.map(updateJob => updateJobPost(updateJob, { recommended:updateRecommended })))
+  if (sf.value === 'RECOMMENDED') await loadRecommendedJobs()
   toast.success(updateRecommended ? `已将 ${n} 条设为推荐` : `已取消 ${n} 条推荐`)
   selected.value = []
 }
@@ -1264,23 +1437,28 @@ async function bulkOffline() {
   const n = offlinableCount.value
   if (!n) return
   const skipped = selected.value.length - n
-  const updateJobs = jobs.value.filter(readJob => selected.value.includes(readJob.id)
+  const updateJobs = (sf.value === 'RECOMMENDED' ? recommendedJobs.value : jobs.value)
+    .filter(readJob => selected.value.includes(readJob.id)
     && readJob.status === 'PUBLISHED')
   await Promise.all(updateJobs.map(updateJob => updateJobPost(updateJob, { status:'OFFLINE' })))
+  if (sf.value === 'RECOMMENDED') await loadRecommendedJobs()
   toast.success(skipped > 0 ? `已停止发布 ${n} 条，跳过 ${skipped} 条（未发布或已截止）` : `已停止发布 ${n} 条`)
   selected.value = []
 }
 function bulkDelete(ids) {
   const targets = ids ?? selected.value
   const n = targets.length
-  confirm_msg.value = `确认删除选中的 ${n} 条岗位？删除后无法找回。`
+  confirm_msg.value = `确认将选中的 ${n} 条岗位移入回收站？之后可以恢复。`
   confirm_cb.value = async () => {
     try {
       await Promise.all(targets.map(deleteId => readJson(`/admin/job-post/${deleteId}`, { method:'DELETE' })))
       jobs.value = jobs.value.filter(readJob => !targets.includes(readJob.id))
-      toast.success(`已删除 ${n} 条`)
+      recommendedJobs.value = recommendedJobs.value.filter(readJob => !targets.includes(readJob.id))
+      toast.success(`已移入回收站 ${n} 条`)
       selected.value = selected.value.filter(readId => !targets.includes(readId))
       draftSelected.value = draftSelected.value.filter(readId => !targets.includes(readId))
+      if (sf.value === 'RECOMMENDED') await loadRecommendedJobs()
+      if (v.value === 'recycle') await loadRecycleBin()
     } catch (readError) {
       toast.error(readError?.message || '删除失败')
     }
@@ -1367,7 +1545,7 @@ const NJ_INIT = () => ({
   positionName: '', companyName: '', department: '', headcount: null,
   jobCategory: '', jobSubCategory: '',
   recruitType: '', reqEduLevel: '',
-  workStartDate: '', workEndDate: '',
+  workStartDate: '', workEndDate: '', applicationDeadline: '',
   workProvince: '', workCity: '', workLocation: '',
   workMode: '', workDurationType: '', workDaysPerWeek: null, workPeriodType: '',
   salaryMin: null, salaryMax: null, salaryDisplay: '',
@@ -1531,13 +1709,13 @@ const expandedRow   = ref(null)
 const currentJobGroup = ref(null)
 const answerGroups = ref({})
 const jobGroups = computed(() => jobs.value
-  .filter(readJob => Number(readJob.applicationCount ?? readJob.apps ?? 0) > 0)
+  .filter(readJob => !readJob.sourceUrl && Number(readJob.applicationCount ?? readJob.apps ?? 0) > 0)
   .map(readJob => ({
     jobId:readJob.id,
     title:readJob.positionName,
     company:readJob.companyName,
     status:readJob.status,
-    dl:(readJob.workEndDate || '').slice(5, 10),
+    dl:(readJob.applicationDeadline || '').slice(5, 10),
     applicationCount:readJob.applicationCount ?? readJob.apps ?? 0,
     questions:answerGroups.value[readJob.id]?.questions || [],
     resumes:answerGroups.value[readJob.id]?.resumes || [],
@@ -1553,7 +1731,7 @@ function parseAnswers(questions, answersJson) {
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map(q => ({
         ...q,
-        value: arr.find(a => a.questionId === q.id)?.value ?? null
+        value: arr.find(a => String(a.questionId) === String(q.id))?.value ?? null
       }))
   } catch { return [] }
 }
@@ -1586,8 +1764,12 @@ async function openJobResumes(readGroup) {
   }
 }
 function goJobResumes(readJob) {
-  const readGroup = jobGroups.value.find(readItem => readItem.jobId === readJob.id)
-  if (readGroup) openJobResumes(readGroup)
+  if (readJob.sourceUrl) return
+  const readGroup = jobGroups.value.find(readItem => String(readItem.jobId) === String(readJob.id))
+    || { jobId: readJob.id, title: readJob.positionName, company: readJob.companyName,
+      status: readJob.status, dl: (readJob.applicationDeadline || '').slice(5, 10),
+      applicationCount: readJob.applicationCount ?? readJob.apps ?? 0 }
+  openJobResumes(readGroup)
 }
 
 function toggleResumeSel(readId) {

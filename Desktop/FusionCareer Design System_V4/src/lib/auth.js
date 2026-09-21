@@ -58,10 +58,8 @@ export function loginUser(readRole) {
     window.location.hash = readDevRole === 'ADMIN' ? '#/admin' : '#/home'
     return
   }
-  const readQuery = import.meta.env.DEV && readRole
-    ? `?role=${encodeURIComponent(readRole)}`
-    : ''
-  window.location.assign(`/fudan/login${readQuery}`)
+  const readTarget = readRole === 'ADMIN' ? 'admin' : 'user'
+  window.location.assign(`/fudan/login?target=${readTarget}`)
 }
 
 export async function logoutUser() {

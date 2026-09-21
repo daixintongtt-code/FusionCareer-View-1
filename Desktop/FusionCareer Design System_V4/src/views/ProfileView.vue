@@ -532,7 +532,7 @@ async function handleEditFile(readQuestionId, readEvent) {
   try {
     const readResult = await uploadQuestionnaireFile(readFile)
     editAnswers.value[readQuestionId] = readResult.originalName
-    editFileIds.value[readQuestionId] = readResult.id
+    editFileIds.value[readQuestionId] = String(readResult.id)
     toast.success('附件上传成功')
   } catch (uploadError) {
     toast.error(uploadError?.message || '附件上传失败')
