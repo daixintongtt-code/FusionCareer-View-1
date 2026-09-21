@@ -166,7 +166,7 @@
                   <td class="col-check"><input type="checkbox" :checked="selected.includes(j.id)" @change="toggleSel(j.id)" /></td>
                   <td><span style="font-weight:500;cursor:pointer;color:var(--ink)" @click="openEdit(j)">{{ j.positionName }}</span></td>
                   <td>{{ j.companyName }}</td>
-                  <td>{{ j.workCity }}</td>
+                  <td>{{ formatCities(j) || '—' }}</td>
                   <td>{{ j.applicationDeadline || '—' }}</td>
                   <td><span :class="['badge', STATUS_CLASS[j.status]]">{{ STATUS_LABEL[j.status] }}</span></td>
                   <td>
@@ -368,14 +368,13 @@
                   <option value="OTHER">其他</option>
                 </select>
               </div>
-              <div class="form-group"><label class="form-label">学历要求</label>
-                <select class="form-control" v-model="nj.reqEduLevel">
-                  <option value="">不限</option>
-                  <option value="UNDERGRADUATE">本科生</option>
-                  <option value="ACADEMIC_MASTER">学术硕士研究生</option>
-                  <option value="PROFESSIONAL_MASTER">专业硕士研究生</option>
-                  <option value="DOCTORAL">博士研究生</option>
-                </select>
+              <div class="form-group span-2"><label class="form-label">学历要求（可多选）</label>
+                <div class="multi-options">
+                  <label v-for="readOption in EDU_OPTIONS" :key="readOption[0]" class="multi-option">
+                    <input v-model="nj.reqEduLevels" type="checkbox" :value="readOption[0]" />
+                    <span>{{ readOption[1] }}</span>
+                  </label>
+                </div>
               </div>
             </div>
           </div>
@@ -392,8 +391,16 @@
               <div class="form-group"><label class="form-label">工作省份</label>
                 <input class="form-control" v-model="nj.workProvince" placeholder="如：上海市" />
               </div>
-              <div class="form-group"><label class="form-label">工作城市</label>
-                <input class="form-control" v-model="nj.workCity" placeholder="如：上海" />
+              <div class="form-group span-2"><label class="form-label">工作城市（可填写多个）</label>
+                <div class="multi-entry">
+                  <input class="form-control" v-model="cityDraft" placeholder="输入城市后按回车，如：上海"
+                    @keyup.enter.prevent="addCity" />
+                  <button class="btn btn-secondary btn-sm" type="button" @click="addCity">添加</button>
+                </div>
+                <div v-if="nj.workCities.length" class="multi-tags">
+                  <button v-for="readCity in nj.workCities" :key="readCity" class="multi-tag" type="button"
+                    @click="removeCity(readCity)">{{ readCity }} <i class="ti ti-x" /></button>
+                </div>
               </div>
               <div class="form-group span-2"><label class="form-label">详细地点</label>
                 <input class="form-control" v-model="nj.workLocation" placeholder="如：徐汇区某路某号" />
@@ -603,7 +610,7 @@
                     <td class="col-check"><input type="checkbox" :checked="draftSelected.includes(j.id)" @change="draftToggleSel(j.id)" /></td>
                     <td><span style="font-weight:500;color:var(--ink)">{{ j.positionName }}</span></td>
                     <td>{{ j.companyName }}</td>
-                    <td>{{ j.workCity }}</td>
+                    <td>{{ formatCities(j) || '—' }}</td>
                     <td>{{ j.applicationDeadline || '—' }}</td>
                     <td>
                       <span v-if="j.sourceType==='CRAWL'" class="badge" style="background:var(--blue-bg,#eaf0fb);color:var(--blue,#1b4f9c);gap:3px;font-size:.7rem"><i class="ti ti-robot" style="font-size:9px" />自动导入</span>
@@ -980,6 +987,7 @@ import {
   normalizeJobImportResult,
   validateJobImportFile,
 } from '@/lib/jobImport.mjs'
+import { EDU_OPTIONS, formatCities, normalizeJobRequirements } from '@/lib/jobRequirements.mjs'
 
 const toast = useToast()
 const v     = ref('list')
@@ -1236,7 +1244,7 @@ async function loadJobs() {
   try {
     const readPage = await readJson('/admin/job-post/list?page=1&size=100')
     jobs.value = (readPage?.list || []).map(readJob => ({
-      ...readJob,
+      ...normalizeJobRequirements(readJob),
       apps: readJob.applicationCount ?? 0,
       publishedAt: (readJob.createdAt || '').slice(0, 10),
     }))
@@ -1259,7 +1267,7 @@ async function loadRecommendedJobs() {
       return loadRecommendedJobs()
     }
     recommendedJobs.value = (readPage?.list || []).map(readJob => ({
-      ...readJob,
+      ...normalizeJobRequirements(readJob),
       apps: readJob.applicationCount ?? 0,
       publishedAt: (readJob.createdAt || '').slice(0, 10),
     }))
@@ -1349,16 +1357,17 @@ async function restoreJob(readJob) {
 }
 
 function buildJobRequest(readJob, updateStatus = readJob.status) {
+  const readNormalized = normalizeJobRequirements(readJob)
   const readKeys = [
     'sourceType', 'sourceUrl', 'companyName', 'department', 'positionName',
     'jobCategory', 'jobSubCategory', 'recruitType', 'headcount',
     'workStartDate', 'workEndDate', 'applicationDeadline', 'workDaysPerWeek', 'workDurationType',
-    'workPeriodType', 'workMode', 'workCity', 'workProvince', 'workLocation',
-    'salaryMin', 'salaryMax', 'salaryDisplay', 'jobDesc', 'reqEduLevel',
+    'workPeriodType', 'workMode', 'workCity', 'workCities', 'workProvince', 'workLocation',
+    'salaryMin', 'salaryMax', 'salaryDisplay', 'jobDesc', 'reqEduLevel', 'reqEduLevels',
     'reqMajor', 'reqGradYear', 'reqSkills', 'reqOther', 'recommended',
   ]
   const createRequest = Object.fromEntries(readKeys.map(readKey => [
-    readKey, readJob[readKey] === '' ? null : readJob[readKey],
+    readKey, readNormalized[readKey] === '' ? null : readNormalized[readKey],
   ]))
   createRequest.status = updateStatus
   return createRequest
@@ -1544,9 +1553,9 @@ const NJ_INIT = () => ({
   sourceUrl: '',
   positionName: '', companyName: '', department: '', headcount: null,
   jobCategory: '', jobSubCategory: '',
-  recruitType: '', reqEduLevel: '',
+  recruitType: '', reqEduLevel: '', reqEduLevels: [],
   workStartDate: '', workEndDate: '', applicationDeadline: '',
-  workProvince: '', workCity: '', workLocation: '',
+  workProvince: '', workCity: '', workCities: [], workLocation: '',
   workMode: '', workDurationType: '', workDaysPerWeek: null, workPeriodType: '',
   salaryMin: null, salaryMax: null, salaryDisplay: '',
   jobDesc: '', reqMajor: '', reqGradYear: '', reqSkills: '', reqOther: '',
@@ -1554,6 +1563,17 @@ const NJ_INIT = () => ({
   questions: [],
 })
 const deliveryMode = ref('internal')  // 'internal' | 'external'
+const cityDraft = ref('')
+
+function addCity() {
+  const readCities = cityDraft.value.split(/[,，、;；]/).map(readCity => readCity.trim()).filter(Boolean)
+  nj.value.workCities = [...new Set([...nj.value.workCities, ...readCities])]
+  cityDraft.value = ''
+}
+
+function removeCity(readCity) {
+  nj.value.workCities = nj.value.workCities.filter(updateCity => updateCity !== readCity)
+}
 
 function addQuestion() {
   nj.value.questions.push({
@@ -1592,7 +1612,7 @@ async function structureJob() {
       method:'POST', body:JSON.stringify({ text:jobText.value }),
     })
     structuredJobs.value = (readResult?.jobs || []).map(readJob => ({
-      ...NJ_INIT(), ...readJob, questions:[],
+      ...NJ_INIT(), ...normalizeJobRequirements(readJob), questions:[],
     }))
     structureWarnings.value = readResult?.warnings || []
     if (!structuredJobs.value.length) {
@@ -1617,7 +1637,7 @@ function selectJob(readIndex) {
   }
   structuredIndex.value = readIndex
   const readJob = structuredJobs.value[readIndex]
-  nj.value = { ...NJ_INIT(), ...readJob, questions:readJob.questions || [] }
+  nj.value = { ...NJ_INIT(), ...normalizeJobRequirements(readJob), questions:readJob.questions || [] }
 }
 
 function openCreate() {
@@ -1632,7 +1652,7 @@ async function openEdit(readJob) {
       ? []
       : await readJson(`/admin/questionnaire/questions/${readJob.id}`)
     editingId.value = readJob.id
-    nj.value = { ...NJ_INIT(), ...readJob, questions:readQuestions || [] }
+    nj.value = { ...NJ_INIT(), ...normalizeJobRequirements(readJob), questions:readQuestions || [] }
     deliveryMode.value = readJob.sourceUrl ? 'external' : 'internal'
     v.value = 'create'
   } catch (readError) {
@@ -1646,6 +1666,7 @@ function validateJob() {
 }
 function resetForm() {
   nj.value = NJ_INIT()
+  cityDraft.value = ''
   editingId.value = null
   deliveryMode.value = 'internal'
   jobText.value = ''
@@ -2303,6 +2324,13 @@ async function exportData() {
   color: var(--ink);
   line-height: 1.55;
 }
+
+.multi-options { display:flex; flex-wrap:wrap; gap:.5rem; }
+.multi-option { display:flex; align-items:center; gap:.35rem; padding:.5rem .7rem; border:1px solid var(--border); border-radius:10px; font-size:.78rem; color:var(--ink-2); cursor:pointer; }
+.multi-option:has(input:checked) { border-color:var(--red); background:var(--red-light); color:var(--red); }
+.multi-entry { display:flex; gap:.5rem; }
+.multi-tags { display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.55rem; }
+.multi-tag { display:inline-flex; align-items:center; gap:.25rem; padding:.28rem .55rem; border:1px solid var(--red-border); border-radius:999px; background:var(--red-light); color:var(--red); font-size:.74rem; cursor:pointer; }
 
 @media (max-width: 720px) {
   .resume-export-head { flex-direction: column; }

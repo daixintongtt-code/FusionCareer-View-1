@@ -224,6 +224,7 @@ import AppToast from '@/components/AppToast.vue'
 import JobCategoryIcon from '@/components/JobCategoryIcon.vue'
 import { useToast } from '@/composables/useToast'
 import { readJson } from '@/lib/api'
+import { formatCities } from '@/lib/jobRequirements.mjs'
 
 const router = useRouter()
 const toast = useToast()
@@ -491,7 +492,7 @@ function mapJob(readJob) {
     category: readJob.jobCategory || 'OTHER',
     title: readJob.positionName,
     company: readJob.companyName,
-    city: readJob.workCity || '',
+    city: formatCities(readJob),
     jobtype: JOBTYPE_LABEL[readJob.jobCategory] || '',
     recruit: recruitLabel(readJob.recruitType),
     l2tags: [
