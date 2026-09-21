@@ -504,7 +504,19 @@ function mapJob(readJob) {
   }
 }
 
+let previousFilterKey = ''
+let jobsRequestId = 0
+
 async function loadJobs() {
+  const readFilterKey = JSON.stringify([
+    kw.value, provinceF.value, cityF.value, jobtypeF.value, recruitF.value,
+    durationF.value, daysF.value, salaryF.value, modeF.value,
+  ])
+  if (readFilterKey !== previousFilterKey) {
+    page.value = 1
+    previousFilterKey = readFilterKey
+  }
+  const readRequestId = ++jobsRequestId
   loading.value = true
   try {
     const readParams = new URLSearchParams({ page: page.value, size: pageSize })
@@ -529,14 +541,18 @@ async function loadJobs() {
     if (modeF.value) readParams.set('workMode', MODE_ENUM[modeF.value] || modeF.value)
     readParams.set('sortBy', sortBy.value === 'deadline' ? 'DEADLINE' : 'NEWEST')
     const readPage = await readJson(`/job/list?${readParams}`)
+    if (readRequestId !== jobsRequestId) return
     const readJobs = readPage?.list || []
     total.value = readPage?.total ?? readJobs.length
     jobs.value = readJobs.map(mapJob)
   } catch (readError) {
+    if (readRequestId !== jobsRequestId) return
     jobs.value = []
     total.value = 0
     toast.error(readError?.message || '加载岗位失败')
-  } finally { loading.value = false }
+  } finally {
+    if (readRequestId === jobsRequestId) loading.value = false
+  }
 }
 
 async function loadRecommendations() {
