@@ -67,10 +67,10 @@
           <template v-if="view==='resume'">
             <div class="card card-p">
               <div class="panel-title"><i class="ti ti-file-description" />简历正文</div>
-              <div ref="resumeContentGrid" class="grid-2">
+              <div class="resume-content-list">
                 <div v-for="item in resumeFields" :key="item.key" class="form-group">
                   <label class="form-label">{{ item.label }}</label>
-                  <textarea class="form-control resume-content-input" v-model="resumeForm[item.key]" @input="resizeResumeTextarea" />
+                  <textarea class="form-control resume-textarea" v-model="resumeForm[item.key]" />
                 </div>
               </div>
               <div style="display:flex;justify-content:flex-end;margin:1rem 0 1.5rem">
@@ -238,7 +238,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import UserNavbar from '@/components/UserNavbar.vue'
 import AppToast from '@/components/AppToast.vue'
@@ -276,13 +276,6 @@ const view = ref(validViews.includes(route.query.tab) ? route.query.tab : 'info'
 watch(() => route.query.tab, (t) => {
   view.value = validViews.includes(t) ? t : 'info'
 })
-watch(view, async (readView) => {
-  if (readView === 'resume') {
-    await nextTick()
-    resizeResumeTextareas()
-  }
-})
-
 onMounted(() => {
   loadProfile()
   loadResume()
@@ -360,25 +353,13 @@ async function saveProfile() {
 }
 
 const resumeFields = [
-  { key:'personalIntro', label:'个人简况' }, { key:'basicInfo', label:'基础信息' },
-  { key:'education', label:'教育背景' }, { key:'internship', label:'实习经历' },
-  { key:'campus', label:'在校经历' }, { key:'awards', label:'荣誉奖励' },
-  { key:'skills', label:'掌握技能' }, { key:'portfolio', label:'作品集' },
+  { key:'personalIntro', label:'个人简介' }, { key:'basicInfo', label:'基本信息' },
+  { key:'education', label:'教育经历' }, { key:'internship', label:'实习经历' },
+  { key:'campus', label:'校园经历' }, { key:'awards', label:'获奖情况' },
+  { key:'skills', label:'技能特长' }, { key:'portfolio', label:'作品集 / 链接' },
   { key:'remark', label:'备注' },
 ]
 const resumeForm = ref(Object.fromEntries(resumeFields.map(readField => [readField.key, ''])))
-const resumeContentGrid = ref(null)
-
-function resizeResumeTextarea(readEventOrElement) {
-  const readTextarea = readEventOrElement?.target || readEventOrElement
-  if (!readTextarea) return
-  readTextarea.style.height = 'auto'
-  readTextarea.style.height = `${Math.max(110, readTextarea.scrollHeight)}px`
-}
-
-function resizeResumeTextareas() {
-  resumeContentGrid.value?.querySelectorAll('textarea').forEach(resizeResumeTextarea)
-}
 
 async function loadResume() {
   try {
@@ -386,8 +367,6 @@ async function loadResume() {
     resumeFields.forEach(readField => {
       resumeForm.value[readField.key] = readResume?.[readField.key] || ''
     })
-    await nextTick()
-    resizeResumeTextareas()
   } catch (readError) {
     toast.error(readError?.message || '加载简历失败')
   }
@@ -695,7 +674,11 @@ function cancelDeleteResume() {
 .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem 1.55rem; }
 .form-label { display: block; font-size: .98rem; font-weight: 650; margin-bottom: .58rem; color: var(--ink); }
 .form-control { width: 100%; min-height: 56px; border-radius: 16px; font-size: 1rem; padding: 0 1.1rem; }
-.resume-content-input { min-height: 110px; padding-top: .9rem; padding-bottom: .9rem; resize: vertical; overflow-y: hidden; }
+.resume-content-list { display: flex; flex-direction: column; gap: 1.1rem; }
+.resume-textarea {
+  min-height: 4.5rem; field-sizing: content; line-height: 1.65;
+  padding-top: .9rem; padding-bottom: .9rem; resize: vertical;
+}
 .btn { min-height: 46px; padding: 0 1.3rem; border-radius: 14px; font-size: .98rem; }
 
 .resume-row { display: flex; align-items: center; gap: 1.25rem; padding: 1.25rem 1.35rem; background: var(--bg-soft); border: 1px solid var(--border); border-radius: 20px; margin-bottom: .95rem; }
