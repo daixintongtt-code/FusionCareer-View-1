@@ -59,7 +59,7 @@
             <input
               class="form-control"
               v-model="searchUsername"
-              placeholder="搜索用户名或学工号…"
+              placeholder="搜索姓名或学工号…"
               @keyup.enter="searchUsers"
             />
             <select class="form-control" v-model="searchUserRole" @change="searchUsers">
@@ -74,7 +74,7 @@
           <div class="card user-table-card">
             <table class="data-table">
               <thead>
-                <tr><th>用户名</th><th>学工号</th><th>角色</th><th class="user-created-column">注册时间</th><th class="user-actions-column">权限设置</th></tr>
+                <tr><th>姓名</th><th>学工号</th><th>角色</th><th class="user-created-column">注册时间</th><th class="user-actions-column">权限设置</th></tr>
               </thead>
               <tbody>
                 <tr v-if="usersLoading"><td colspan="5" class="table-state"><i class="ti ti-loader-2 user-spin" /> 用户加载中…</td></tr>
@@ -92,7 +92,7 @@
                   :class="['user-table-row', canViewAdminUserDetail(user.role) && 'has-detail']"
                   @click="canViewAdminUserDetail(user.role) && openUserDetail(user)"
                 >
-                  <td style="font-weight:600">{{ user.username || user.realName || '—' }}</td>
+                  <td style="font-weight:600">{{ user.realName || user.username || '—' }}</td>
                   <td style="font-family:monospace;color:var(--ink-2)">{{ user.studentId || '—' }}</td>
                   <td><span :class="['badge', adminRoleClass(user.role)]">{{ adminRoleLabel(user.role) }}</span></td>
                   <td class="user-created-column" style="color:var(--ink-3)">{{ formatDateTime(user.createdAt) }}</td>
@@ -203,6 +203,9 @@
               <h1><i :class="editingId?'ti ti-edit':'ti ti-plus'" />{{ editingId ? '编辑岗位' : '新建岗位' }}</h1>
               <p>{{ editingId ? '修改岗位信息，确认后保存发布' : '粘贴原始岗位描述，智能识别后校对发布' }}</p>
             </div>
+            <button v-if="editingId" class="btn btn-secondary btn-sm" @click="leaveJobEditor">
+              <i class="ti ti-arrow-left" />{{ editingReturnView === 'drafts' ? '返回草稿箱' : '返回岗位列表' }}
+            </button>
           </div>
 
           <div v-if="!editingId" class="create-entry-grid">
@@ -560,7 +563,7 @@
 
           <div class="card card-p">
             <div style="display:flex;align-items:center;justify-content:flex-end;gap:.5rem">
-              <button class="btn btn-secondary btn-sm" @click="v='list'; resetForm()">取消</button>
+              <button class="btn btn-secondary btn-sm" @click="leaveJobEditor">取消</button>
               <button class="btn btn-secondary btn-sm" @click="saveDraft"><i class="ti ti-device-floppy" />保存草稿</button>
               <button class="btn btn-primary btn-sm" @click="publishJob"><i class="ti ti-send" />发布上线</button>
             </div>
@@ -1124,7 +1127,7 @@ async function loadUsers() {
       readUserPage.value = readPage.totalPages
       return loadUsers()
     }
-    displayUsers.value = readPage.list
+    displayUsers.value = await hydrateAdminUserNames(readPage.list)
     readUserTotal.value = readPage.total
     readUserPages.value = readPage.totalPages
   } catch (readError) {
@@ -1135,6 +1138,18 @@ async function loadUsers() {
   } finally {
     usersLoading.value = false
   }
+}
+
+async function hydrateAdminUserNames(readUsers) {
+  const readProfiles = await Promise.allSettled(readUsers.map(readUser => {
+    if (readUser.realName || readUser.id == null) return Promise.resolve(null)
+    return readJson(`/admin/user/${encodeURIComponent(readUser.id)}/profile`)
+  }))
+  return readUsers.map((readUser, readIndex) => {
+    const readResult = readProfiles[readIndex]
+    const readProfile = readResult?.status === 'fulfilled' ? readResult.value : null
+    return { ...readUser, realName: readProfile?.realName || readUser.realName || '' }
+  })
 }
 
 function searchUsers() {
@@ -1640,6 +1655,7 @@ function moveQ(idx, dir) {
 }
 const nj = ref(NJ_INIT())
 const editingId = ref(null)
+const editingReturnView = ref('list')
 const jobText = ref('')
 const structuringJob = ref(false)
 const structuredJobs = ref([])
@@ -1731,7 +1747,9 @@ function openCreate() {
 
 async function openEdit(readJob) {
   try {
+    const readReturnView = v.value === 'drafts' ? 'drafts' : 'list'
     resetForm()
+    editingReturnView.value = readReturnView
     const readQuestions = readJob.sourceUrl
       ? []
       : await readJson(`/admin/questionnaire/questions/${readJob.id}`)
@@ -1752,6 +1770,7 @@ function resetForm() {
   nj.value = NJ_INIT()
   cityDraft.value = ''
   editingId.value = null
+  editingReturnView.value = 'list'
   deliveryMode.value = 'internal'
   jobText.value = ''
   structuredJobs.value = []
@@ -1759,6 +1778,13 @@ function resetForm() {
   structureWarnings.value = []
   bulkImportFile.value = null
   bulkDragActive.value = false
+}
+
+function leaveJobEditor() {
+  const readReturnView = editingReturnView.value
+  resetForm()
+  if (readReturnView === 'drafts') showDrafts()
+  else showJobs()
 }
 
 async function saveDraft() {
@@ -1775,6 +1801,7 @@ async function publishJob() {
 async function saveJob(updateStatus) {
   try {
     const readStructuredIndex = structuredIndex.value
+    const readReturnView = editingReturnView.value
     let readJobId = editingId.value
     if (readJobId) {
       await readJson(`/admin/job-post/${readJobId}`, {
@@ -1802,6 +1829,9 @@ async function saveJob(updateStatus) {
     await loadJobs()
     if (readStructuredIndex >= 0) {
       finishStructuredJob(readStructuredIndex)
+    } else if (readReturnView === 'drafts' && updateStatus === 'OFFLINE') {
+      resetForm()
+      showDrafts()
     } else {
       v.value = 'list'
       resetForm()
