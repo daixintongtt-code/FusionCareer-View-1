@@ -386,7 +386,7 @@ const fileInput = ref(null)
 const showDeleteModal = ref(false)
 const deleteIndex = ref(null)
 const readQuota = ref('配额加载中')
-const updateProfile = ref(false)
+const updateProfile = ref(true)
 const uploadingFile = ref(false)
 const failedFileId = ref(null)
 
