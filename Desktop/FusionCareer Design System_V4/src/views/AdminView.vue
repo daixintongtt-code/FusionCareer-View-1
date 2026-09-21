@@ -29,11 +29,11 @@
       <!-- 侧边栏 -->
       <aside class="sidebar">
         <div class="sidebar-label">岗位管理</div>
-        <button :class="['sidebar-link', v==='list'&&'active']" @click="v='list'"><i class="ti ti-list" />岗位列表</button>
+        <button :class="['sidebar-link', v==='list'&&'active']" @click="showJobs"><i class="ti ti-list" />岗位列表</button>
         <button :class="['sidebar-link', v==='create'&&'active']" @click="openCreate"><i class="ti ti-plus" />新建岗位</button>
-        <button :class="['sidebar-link', v==='drafts'&&'active']" @click="v='drafts'"><i class="ti ti-inbox" />草稿箱<span v-if="draftCount>0" class="sidebar-badge">{{ draftCount }}</span></button>
+        <button :class="['sidebar-link', v==='drafts'&&'active']" @click="showDrafts"><i class="ti ti-inbox" />草稿箱<span v-if="draftCount>0" class="sidebar-badge">{{ draftCount }}</span></button>
         <button :class="['sidebar-link', v==='recycle'&&'active']" @click="showRecycleBin"><i class="ti ti-recycle" />回收站</button>
-        <button :class="['sidebar-link', v==='resumes'&&'active']" @click="v='resumes'"><i class="ti ti-file-text" />简历管理</button>
+        <button :class="['sidebar-link', v==='resumes'&&'active']" @click="showResumes"><i class="ti ti-file-text" />简历管理</button>
         <template v-if="isSuperAdmin">
           <div class="sidebar-label">系统管理</div>
           <button :class="['sidebar-link', v==='users'&&'active']" @click="showUsers"><i class="ti ti-users" />用户管理</button>
@@ -124,6 +124,7 @@
             <button class="page-btn" :disabled="readUserPage<=1" @click="changeUserPage(readUserPage-1)"><i class="ti ti-chevron-left" /></button>
             <span>第 {{ readUserPage }} / {{ readUserPages }} 页</span>
             <button class="page-btn" :disabled="readUserPage>=readUserPages" @click="changeUserPage(readUserPage+1)"><i class="ti ti-chevron-right" /></button>
+            <PageJump :current="readUserPage" :total="readUserPages" @change="changeUserPage" />
           </div>
         </div>
 
@@ -187,14 +188,11 @@
             </table>
           </div>
           <div class="pagination" style="margin-top:.875rem">
-            <span style="font-size:.773rem;color:var(--ink-3);margin-right:auto">
-              {{ sf === 'RECOMMENDED' ? `共 ${recommendedTotal} 条推荐岗位` : `当前显示 ${filteredJobs.length} 条` }}
-            </span>
-            <template v-if="sf === 'RECOMMENDED'">
-              <button class="page-btn" :disabled="recommendedPage<=1" @click="changeRecommendedPage(recommendedPage-1)"><i class="ti ti-chevron-left" /></button>
-              <span>第 {{ recommendedPage }} / {{ recommendedPages }} 页</span>
-              <button class="page-btn" :disabled="recommendedPage>=recommendedPages" @click="changeRecommendedPage(recommendedPage+1)"><i class="ti ti-chevron-right" /></button>
-            </template>
+            <span style="font-size:.773rem;color:var(--ink-3);margin-right:auto">共 {{ jobTotal }} 条岗位</span>
+            <button class="page-btn" :disabled="jobPage<=1" @click="changeJobPage(jobPage-1)"><i class="ti ti-chevron-left" /></button>
+            <span>第 {{ jobPage }} / {{ jobPages }} 页</span>
+            <button class="page-btn" :disabled="jobPage>=jobPages" @click="changeJobPage(jobPage+1)"><i class="ti ti-chevron-right" /></button>
+            <PageJump :current="jobPage" :total="jobPages" @change="changeJobPage" />
           </div>
         </div>
 
@@ -638,6 +636,13 @@
                 </tbody>
               </table>
             </div>
+            <div class="pagination" style="margin-top:.875rem">
+              <span style="font-size:.773rem;color:var(--ink-3);margin-right:auto">共 {{ draftTotal }} 条草稿</span>
+              <button class="page-btn" :disabled="draftPage<=1" @click="changeDraftPage(draftPage-1)"><i class="ti ti-chevron-left" /></button>
+              <span>第 {{ draftPage }} / {{ draftPages }} 页</span>
+              <button class="page-btn" :disabled="draftPage>=draftPages" @click="changeDraftPage(draftPage+1)"><i class="ti ti-chevron-right" /></button>
+              <PageJump :current="draftPage" :total="draftPages" @change="changeDraftPage" />
+            </div>
           </template>
         </div>
 
@@ -677,6 +682,7 @@
               <button class="page-btn" :disabled="recyclePage<=1" @click="changeRecyclePage(recyclePage-1)"><i class="ti ti-chevron-left" /></button>
               <span>第 {{ recyclePage }} / {{ recyclePages }} 页</span>
               <button class="page-btn" :disabled="recyclePage>=recyclePages" @click="changeRecyclePage(recyclePage+1)"><i class="ti ti-chevron-right" /></button>
+              <PageJump :current="recyclePage" :total="recyclePages" @change="changeRecyclePage" />
             </div>
           </template>
         </div>
@@ -717,6 +723,13 @@
               <i class="ti ti-chevron-right" style="color:var(--ink-4);font-size:1rem;flex-shrink:0" />
             </div>
           </div>
+          <div v-if="jobGroups.length" class="pagination" style="margin-top:.875rem">
+            <span style="font-size:.773rem;color:var(--ink-3);margin-right:auto">共 {{ resumeJobTotal }} 个岗位</span>
+            <button class="page-btn" :disabled="resumeJobPage<=1" @click="changeResumeJobPage(resumeJobPage-1)"><i class="ti ti-chevron-left" /></button>
+            <span>第 {{ resumeJobPage }} / {{ resumeJobPages }} 页</span>
+            <button class="page-btn" :disabled="resumeJobPage>=resumeJobPages" @click="changeResumeJobPage(resumeJobPage+1)"><i class="ti ti-chevron-right" /></button>
+            <PageJump :current="resumeJobPage" :total="resumeJobPages" @change="changeResumeJobPage" />
+          </div>
         </div>
 
         <!-- ───── 简历管理：某岗位问卷列表 ───── -->
@@ -724,10 +737,10 @@
           <div class="page-hd">
             <div>
               <h1><i class="ti ti-file-text" />{{ currentJobGroup?.title }}</h1>
-              <p>{{ currentJobGroup?.company }} · 共 {{ currentJobGroup?.resumes.length || 0 }} 份投递简历</p>
+              <p>{{ currentJobGroup?.company }} · 共 {{ answerTotal }} 份投递简历</p>
             </div>
             <div class="page-hd-actions">
-              <button class="btn btn-secondary btn-sm" @click="v='resumes'; resumeSel=[]"><i class="ti ti-arrow-left" />返回</button>
+              <button class="btn btn-secondary btn-sm" @click="showResumes"><i class="ti ti-arrow-left" />返回</button>
             </div>
           </div>
 
@@ -885,6 +898,13 @@
               </tbody>
             </table>
           </div>
+          <div v-if="currentJobGroup?.resumes.length" class="pagination" style="margin-top:.875rem">
+            <span style="font-size:.773rem;color:var(--ink-3);margin-right:auto">共 {{ answerTotal }} 份投递</span>
+            <button class="page-btn" :disabled="answerPage<=1" @click="changeAnswerPage(answerPage-1)"><i class="ti ti-chevron-left" /></button>
+            <span>第 {{ answerPage }} / {{ answerPages }} 页</span>
+            <button class="page-btn" :disabled="answerPage>=answerPages" @click="changeAnswerPage(answerPage+1)"><i class="ti ti-chevron-right" /></button>
+            <PageJump :current="answerPage" :total="answerPages" @change="changeAnswerPage" />
+          </div>
         </div>
 
       </main>
@@ -974,6 +994,7 @@
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import AppToast from '@/components/AppToast.vue'
+import PageJump from '@/components/PageJump.vue'
 import { useToast } from '@/composables/useToast'
 import { logoutUser, readUser } from '@/lib/auth'
 import { downloadFile as downloadBlob, readJson, uploadForm } from '@/lib/api'
@@ -1234,10 +1255,14 @@ function cancelConfirm() { show_confirm.value = false }
 
 
 const jobs = ref([])
-const recommendedJobs = ref([])
-const recommendedPage = ref(1)
-const recommendedPages = ref(1)
-const recommendedTotal = ref(0)
+const jobPage = ref(1)
+const jobPages = ref(1)
+const jobTotal = ref(0)
+const JOB_PAGE_SIZE = 20
+const draftJobs = ref([])
+const draftPage = ref(1)
+const draftPages = ref(1)
+const draftTotal = ref(0)
 const recycleJobs = ref([])
 const recycleKeyword = ref('')
 const recyclePage = ref(1)
@@ -1252,64 +1277,85 @@ const STATUS_ORDER = { PUBLISHED:0, OFFLINE:1, EXPIRED:2 }
 
 async function loadJobs() {
   try {
-    const readPage = await readJson('/admin/job-post/list?page=1&size=100')
+    const readParams = new URLSearchParams({
+      page: String(jobPage.value), size: String(JOB_PAGE_SIZE),
+    })
+    if (sk.value.trim()) readParams.set('keyword', sk.value.trim())
+    if (sf.value === 'RECOMMENDED') {
+      readParams.set('status', 'PUBLISHED')
+      readParams.set('recommended', 'true')
+    } else if (sf.value) readParams.set('status', sf.value)
+    const readPage = await readJson(`/admin/job-post/list?${readParams}`)
+    const readPages = Math.max(1, Number(readPage?.totalPages || 1))
+    if (jobPage.value > readPages) {
+      jobPage.value = readPages
+      return loadJobs()
+    }
     jobs.value = (readPage?.list || []).map(readJob => ({
       ...normalizeJobRequirements(readJob),
       apps: readJob.applicationCount ?? 0,
       publishedAt: (readJob.createdAt || '').slice(0, 10),
     }))
+    jobTotal.value = Number(readPage?.total || 0)
+    jobPages.value = readPages
   } catch (readError) {
     jobs.value = []
+    jobTotal.value = 0
+    jobPages.value = 1
     toast.error(readError?.message || '加载岗位失败')
   }
 }
 
-async function loadRecommendedJobs() {
+async function loadDrafts() {
   try {
     const readParams = new URLSearchParams({
-      page: String(recommendedPage.value), size: '20', status: 'PUBLISHED', recommended: 'true',
+      page: String(draftPage.value), size: String(JOB_PAGE_SIZE), status: 'OFFLINE',
     })
-    if (sk.value.trim()) readParams.set('keyword', sk.value.trim())
     const readPage = await readJson(`/admin/job-post/list?${readParams}`)
     const readPages = Math.max(1, Number(readPage?.totalPages || 1))
-    if (recommendedPage.value > readPages) {
-      recommendedPage.value = readPages
-      return loadRecommendedJobs()
+    if (draftPage.value > readPages) {
+      draftPage.value = readPages
+      return loadDrafts()
     }
-    recommendedJobs.value = (readPage?.list || []).map(readJob => ({
+    draftJobs.value = (readPage?.list || []).map(readJob => ({
       ...normalizeJobRequirements(readJob),
       apps: readJob.applicationCount ?? 0,
       publishedAt: (readJob.createdAt || '').slice(0, 10),
     }))
-    recommendedTotal.value = Number(readPage?.total || 0)
-    recommendedPages.value = readPages
+    draftTotal.value = Number(readPage?.total || 0)
+    draftPages.value = readPages
   } catch (readError) {
-    recommendedJobs.value = []
-    recommendedTotal.value = 0
-    toast.error(readError?.message || '加载推荐岗位失败')
+    draftJobs.value = []
+    draftTotal.value = 0
+    draftPages.value = 1
+    toast.error(readError?.message || '加载草稿失败')
   }
 }
 
 function searchAdminJobs() {
-  if (sf.value !== 'RECOMMENDED') return
-  recommendedPage.value = 1
-  loadRecommendedJobs()
+  jobPage.value = 1
+  selected.value = []
+  loadJobs()
 }
 
-function changeRecommendedPage(readPage) {
-  if (readPage < 1 || readPage > recommendedPages.value || readPage === recommendedPage.value) return
-  recommendedPage.value = readPage
+function changeJobPage(readPage) {
+  if (readPage < 1 || readPage > jobPages.value || readPage === jobPage.value) return
+  jobPage.value = readPage
   selected.value = []
-  loadRecommendedJobs()
+  loadJobs()
 }
 
-watch(sf, readStatus => {
-  selected.value = []
-  if (readStatus === 'RECOMMENDED') {
-    recommendedPage.value = 1
-    loadRecommendedJobs()
-  }
-})
+function changeDraftPage(readPage) {
+  if (readPage < 1 || readPage > draftPages.value || readPage === draftPage.value) return
+  draftPage.value = readPage
+  draftSelected.value = []
+  loadDrafts()
+}
+
+function showJobs() { v.value = 'list'; loadJobs() }
+function showDrafts() { v.value = 'drafts'; loadDrafts() }
+
+watch(sf, searchAdminJobs)
 
 async function loadRecycleBin() {
   recycleLoading.value = true
@@ -1383,13 +1429,7 @@ function buildJobRequest(readJob, updateStatus = readJob.status) {
   return createRequest
 }
 const filteredJobs = computed(() =>
-  (sf.value === 'RECOMMENDED' ? recommendedJobs.value : jobs.value)
-    .filter(j =>
-      (!sk.value || j.positionName.includes(sk.value) || j.companyName.includes(sk.value)) &&
-      (!sf.value || (sf.value === 'RECOMMENDED'
-        ? j.status === 'PUBLISHED' && j.recommended
-        : j.status === sf.value))
-    )
+  jobs.value
     .slice()
     .sort((a, b) => {
       const sd = (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9)
@@ -1397,16 +1437,15 @@ const filteredJobs = computed(() =>
       return (b.publishedAt || '').localeCompare(a.publishedAt || '')
     })
 )
-const draftJobs   = computed(() => jobs.value.filter(j => j.status === 'OFFLINE'))
 const onlineCount = computed(() => jobs.value.filter(j => j.status === 'PUBLISHED').length)
-const draftCount  = computed(() => draftJobs.value.length)
+const draftCount  = computed(() => draftTotal.value)
 
 function toggleAll(c) { selected.value = c ? filteredJobs.value.map(j=>j.id) : [] }
 function toggleSel(id) { selected.value.includes(id) ? selected.value = selected.value.filter(i=>i!==id) : selected.value.push(id) }
 async function toggleRec(updateJob) {
   const updateRecommended = !updateJob.recommended
   await updateJobPost(updateJob, { recommended:updateRecommended })
-  if (sf.value === 'RECOMMENDED') await loadRecommendedJobs()
+  if (sf.value === 'RECOMMENDED') await loadJobs()
   toast.success(updateRecommended ? '已设为推荐' : '已取消推荐')
 }
 async function publish(updateJob) {
@@ -1428,10 +1467,8 @@ async function updateJobPost(updateJob, updateFields) {
 
 // 批量操作
 const publishableCount = computed(() => selected.value.filter(id => jobs.value.find(j=>j.id===id)?.status === 'OFFLINE').length)
-const offlinableCount  = computed(() => selected.value.filter(id =>
-  [...jobs.value, ...recommendedJobs.value].find(j => j.id === id)?.status === 'PUBLISHED').length)
-const recableCount = computed(() => selected.value.filter(id =>
-  [...jobs.value, ...recommendedJobs.value].find(j => j.id === id)?.status === 'PUBLISHED').length)
+const offlinableCount  = computed(() => selected.value.filter(id => jobs.value.find(j => j.id === id)?.status === 'PUBLISHED').length)
+const recableCount = computed(() => selected.value.filter(id => jobs.value.find(j => j.id === id)?.status === 'PUBLISHED').length)
 
 async function bulkPublish() {
   const n = publishableCount.value
@@ -1445,10 +1482,9 @@ async function bulkPublish() {
 }
 async function bulkRec(updateRecommended) {
   const n = selected.value.length
-  const updateJobs = (sf.value === 'RECOMMENDED' ? recommendedJobs.value : jobs.value)
-    .filter(readJob => selected.value.includes(readJob.id))
+  const updateJobs = jobs.value.filter(readJob => selected.value.includes(readJob.id))
   await Promise.all(updateJobs.map(updateJob => updateJobPost(updateJob, { recommended:updateRecommended })))
-  if (sf.value === 'RECOMMENDED') await loadRecommendedJobs()
+  if (sf.value === 'RECOMMENDED') await loadJobs()
   toast.success(updateRecommended ? `已将 ${n} 条设为推荐` : `已取消 ${n} 条推荐`)
   selected.value = []
 }
@@ -1456,11 +1492,10 @@ async function bulkOffline() {
   const n = offlinableCount.value
   if (!n) return
   const skipped = selected.value.length - n
-  const updateJobs = (sf.value === 'RECOMMENDED' ? recommendedJobs.value : jobs.value)
-    .filter(readJob => selected.value.includes(readJob.id)
+  const updateJobs = jobs.value.filter(readJob => selected.value.includes(readJob.id)
     && readJob.status === 'PUBLISHED')
   await Promise.all(updateJobs.map(updateJob => updateJobPost(updateJob, { status:'OFFLINE' })))
-  if (sf.value === 'RECOMMENDED') await loadRecommendedJobs()
+  if (sf.value === 'RECOMMENDED') await loadJobs()
   toast.success(skipped > 0 ? `已停止发布 ${n} 条，跳过 ${skipped} 条（未发布或已截止）` : `已停止发布 ${n} 条`)
   selected.value = []
 }
@@ -1472,11 +1507,11 @@ function bulkDelete(ids) {
     try {
       await Promise.all(targets.map(deleteId => readJson(`/admin/job-post/${deleteId}`, { method:'DELETE' })))
       jobs.value = jobs.value.filter(readJob => !targets.includes(readJob.id))
-      recommendedJobs.value = recommendedJobs.value.filter(readJob => !targets.includes(readJob.id))
+      draftJobs.value = draftJobs.value.filter(readJob => !targets.includes(readJob.id))
       toast.success(`已移入回收站 ${n} 条`)
       selected.value = selected.value.filter(readId => !targets.includes(readId))
       draftSelected.value = draftSelected.value.filter(readId => !targets.includes(readId))
-      if (sf.value === 'RECOMMENDED') await loadRecommendedJobs()
+      await Promise.all([loadJobs(), loadDrafts()])
       if (v.value === 'recycle') await loadRecycleBin()
     } catch (readError) {
       toast.error(readError?.message || '删除失败')
@@ -1490,10 +1525,11 @@ function draftToggleAll(c) { draftSelected.value = c ? draftJobs.value.map(j=>j.
 function draftToggleSel(id) { draftSelected.value.includes(id) ? draftSelected.value = draftSelected.value.filter(i=>i!==id) : draftSelected.value.push(id) }
 async function draftBulkPublish() {
   const n = draftSelected.value.length
-  const updateJobs = jobs.value.filter(readJob => draftSelected.value.includes(readJob.id))
+  const updateJobs = draftJobs.value.filter(readJob => draftSelected.value.includes(readJob.id))
   await Promise.all(updateJobs.map(updateJob => updateJobPost(updateJob, { status:'PUBLISHED' })))
   toast.success(`已发布 ${n} 条`)
   draftSelected.value = []
+  await Promise.all([loadJobs(), loadDrafts()])
 }
 function draftBulkDelete() { bulkDelete([...draftSelected.value]) }
 
@@ -1540,7 +1576,7 @@ async function importJobWorkbook() {
     const readResult = await uploadForm(JOB_IMPORT_ENDPOINT, readForm)
     bulkImportResult.value = normalizeJobImportResult(readResult)
     bulkImportFile.value = null
-    await loadJobs()
+    await Promise.all([loadJobs(), loadDrafts()])
     v.value = 'drafts'
     if (bulkImportResult.value.failedCount > 0) {
       toast.error(`导入完成，${bulkImportResult.value.failedCount} 条记录失败`)
@@ -1782,7 +1818,14 @@ const resumeSel     = ref([])
 const expandedRow   = ref(null)
 const currentJobGroup = ref(null)
 const answerGroups = ref({})
-const jobGroups = computed(() => jobs.value
+const resumeJobs = ref([])
+const resumeJobPage = ref(1)
+const resumeJobPages = ref(1)
+const resumeJobTotal = ref(0)
+const answerPage = ref(1)
+const answerPages = ref(1)
+const answerTotal = ref(0)
+const jobGroups = computed(() => resumeJobs.value
   .filter(readJob => !readJob.sourceUrl && Number(readJob.applicationCount ?? readJob.apps ?? 0) > 0)
   .map(readJob => ({
     jobId:readJob.id,
@@ -1806,43 +1849,111 @@ function parseAnswers(questions, answersJson) {
       .map(q => ({
         ...q,
         value: arr.find(a => String(a.questionId) === String(q.id))?.value ?? null
-      }))
+  }))
+
+async function loadResumeJobs() {
+  try {
+    const readParams = new URLSearchParams({
+      page: String(resumeJobPage.value), size: String(JOB_PAGE_SIZE),
+      status: 'PUBLISHED', internalApply: 'true',
+    })
+    const readPage = await readJson(`/admin/job-post/list?${readParams}`)
+    const readPages = Math.max(1, Number(readPage?.totalPages || 1))
+    if (resumeJobPage.value > readPages) {
+      resumeJobPage.value = readPages
+      return loadResumeJobs()
+    }
+    resumeJobs.value = (readPage?.list || []).map(readJob => ({
+      ...normalizeJobRequirements(readJob),
+      apps: readJob.applicationCount ?? 0,
+    }))
+    resumeJobTotal.value = Number(readPage?.total || 0)
+    resumeJobPages.value = readPages
+  } catch (readError) {
+    resumeJobs.value = []
+    resumeJobTotal.value = 0
+    resumeJobPages.value = 1
+    toast.error(readError?.message || '投递岗位加载失败')
+  }
+}
+
+function showResumes() {
+  v.value = 'resumes'
+  currentJobGroup.value = null
+  resumeSel.value = []
+  expandedRow.value = null
+  loadResumeJobs()
+}
+
+function changeResumeJobPage(readPage) {
+  if (readPage < 1 || readPage > resumeJobPages.value || readPage === resumeJobPage.value) return
+  resumeJobPage.value = readPage
+  loadResumeJobs()
+}
   } catch { return [] }
 }
 
-async function openJobResumes(readGroup) {
+function mapAnswer(readAnswer) {
+  return {
+    id:readAnswer.id,
+    name:readAnswer.username || '未知学生',
+    sid:readAnswer.studentId || '',
+    date:(readAnswer.updatedAt || readAnswer.createdAt || '').slice(0, 10),
+    answers:readAnswer.answers || '[]',
+    submissionStatus:readAnswer.submissionStatus,
+    statusLabel:readAnswer.statusLabel || '',
+    reviewPassed:readAnswer.reviewPassed,
+    reviewComments:readAnswer.reviewComments || '',
+    reviewedAt:readAnswer.reviewedAt || '',
+  }
+}
+
+async function loadAnswers() {
+  if (!currentJobGroup.value) return
   try {
+    const readJobId = currentJobGroup.value.jobId
     const [readQuestions, readPage] = await Promise.all([
-      readJson(`/admin/questionnaire/questions/${readGroup.jobId}`),
-      readJson(`/admin/questionnaire/answers/job/${readGroup.jobId}?page=1&size=100`),
+      readJson(`/admin/questionnaire/questions/${readJobId}`),
+      readJson(`/admin/questionnaire/answers/job/${readJobId}?page=${answerPage.value}&size=${JOB_PAGE_SIZE}`),
     ])
-    const readResumes = (readPage?.list || []).map(readAnswer => ({
-      id:readAnswer.id,
-      name:readAnswer.username || '未知学生',
-      sid:readAnswer.studentId || '',
-      date:(readAnswer.updatedAt || readAnswer.createdAt || '').slice(0, 10),
-      answers:readAnswer.answers || '[]',
-      submissionStatus:readAnswer.submissionStatus,
-      statusLabel:readAnswer.statusLabel || '',
-      reviewPassed:readAnswer.reviewPassed,
-      reviewComments:readAnswer.reviewComments || '',
-      reviewedAt:readAnswer.reviewedAt || '',
-    }))
-    answerGroups.value[readGroup.jobId] = { questions:readQuestions || [], resumes:readResumes }
-    currentJobGroup.value = { ...readGroup, questions:readQuestions || [], resumes:readResumes }
-    resumeSel.value = []
-    expandedRow.value = null
-    v.value = 'resumeDetail'
+    const readPages = Math.max(1, Number(readPage?.totalPages || 1))
+    if (answerPage.value > readPages) {
+      answerPage.value = readPages
+      return loadAnswers()
+    }
+    const readResumes = (readPage?.list || []).map(mapAnswer)
+    answerGroups.value[readJobId] = { questions:readQuestions || [], resumes:readResumes }
+    currentJobGroup.value = { ...currentJobGroup.value, questions:readQuestions || [], resumes:readResumes }
+    answerTotal.value = Number(readPage?.total || 0)
+    answerPages.value = readPages
   } catch (readError) {
     toast.error(readError?.message || '加载投递失败')
   }
 }
+
+function openJobResumes(readGroup) {
+  currentJobGroup.value = { ...readGroup, questions:[], resumes:[] }
+  answerPage.value = 1
+  answerPages.value = 1
+  answerTotal.value = 0
+  resumeSel.value = []
+  expandedRow.value = null
+  v.value = 'resumeDetail'
+  loadAnswers()
+}
+
+function changeAnswerPage(readPage) {
+  if (readPage < 1 || readPage > answerPages.value || readPage === answerPage.value) return
+  answerPage.value = readPage
+  resumeSel.value = []
+  expandedRow.value = null
+  loadAnswers()
+}
 function goJobResumes(readJob) {
   if (readJob.sourceUrl) return
-  const readGroup = jobGroups.value.find(readItem => String(readItem.jobId) === String(readJob.id))
-    || { jobId: readJob.id, title: readJob.positionName, company: readJob.companyName,
-      status: readJob.status, dl: (readJob.applicationDeadline || '').slice(5, 10),
-      applicationCount: readJob.applicationCount ?? readJob.apps ?? 0 }
+  const readGroup = { jobId: readJob.id, title: readJob.positionName, company: readJob.companyName,
+    status: readJob.status, dl: (readJob.applicationDeadline || '').slice(5, 10),
+    applicationCount: readJob.applicationCount ?? readJob.apps ?? 0 }
   openJobResumes(readGroup)
 }
 
@@ -1887,7 +1998,7 @@ async function reviewAnswers(updatePassed) {
     await readJson(`/admin/questionnaire/answers/job/${currentJobGroup.value.jobId}/review-batch`, {
       method:'PUT', body:JSON.stringify({ passed:updatePassed, comments:updateComments }),
     })
-    await openJobResumes(currentJobGroup.value)
+    await loadAnswers()
     toast.success('批量审核完成')
   } catch (readError) {
     toast.error(readError?.message || '批量审核失败')
@@ -1897,6 +2008,7 @@ async function reviewAnswers(updatePassed) {
 onMounted(() => {
   loadAdmin()
   loadJobs()
+  loadDrafts()
 })
 
 async function exportData() {

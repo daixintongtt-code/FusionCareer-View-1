@@ -325,7 +325,9 @@ async function loadJob() {
 }</script>
 
 <style scoped>
-.detail-layout { display:grid; grid-template-columns:1fr 295px; gap:1.5rem; align-items:start; }
+.detail-layout { display:grid; grid-template-columns:minmax(0, 1fr) 295px; gap:1.5rem; align-items:start; }
+.detail-layout > div { min-width: 0; }
+.detail-layout .card { overflow-wrap: anywhere; }
 .apply-sidebar { position:sticky; top:calc(var(--nav-h) + 1rem); }
 .ds-title { font-size:.867rem; font-weight:600; color:var(--ink); margin-bottom:.65rem; display:flex; align-items:center; gap:.4rem; }
 .ds-title i { color:var(--red); }
