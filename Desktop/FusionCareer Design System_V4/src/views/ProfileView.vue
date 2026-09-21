@@ -97,7 +97,7 @@
               <input
                 ref="fileInput"
                 type="file"
-                accept=".pdf,image/*"
+                accept=".pdf,.docx,image/*"
                 style="display:none"
                 @change="uploadFile"
               />
@@ -109,7 +109,7 @@
               >
                 <i :class="['ti', uploadingFile ? 'ti-loader-2 upload-spinner' : 'ti-cloud-upload']" />
                 <div class="uz-title">{{ uploadingFile ? '正在上传并处理简历…' : '上传新简历' }}</div>
-                <div class="uz-hint">支持 PDF、JPG、PNG，单文件不超过 20 MB · {{ readQuota }}</div>
+                <div class="uz-hint">支持 PDF、DOCX、JPG、PNG，单文件不超过 20 MB · {{ readQuota }}</div>
               </div>
               <label class="profile-sync-option" :class="{ disabled: uploadingFile }">
                 <input type="checkbox" v-model="updateProfile" :disabled="uploadingFile" />
@@ -204,7 +204,7 @@
                   </div>
                   <div class="resume-picker-section-label" style="margin-top:.6rem">或上传本地文件</div>
                   <div class="resume-picker-item resume-picker-upload" @click="triggerEditFile(q.id)">
-                    <input type="file" style="display:none" :ref="el => { editFileRefs[q.id] = el }" accept=".pdf,image/*" @change="e => handleEditFile(q.id, e)" />
+                    <input type="file" style="display:none" :ref="el => { editFileRefs[q.id] = el }" accept=".pdf,.docx,image/*" @change="e => handleEditFile(q.id, e)" />
                     <i class="ti ti-cloud-upload" />
                     <span>点击上传（PDF / 图片）</span>
                   </div>
@@ -561,9 +561,9 @@ async function uploadFile(e) {
   const file = e.target.files?.[0]
   if (!file) return
   const ext = file.name.split('.').pop().toLowerCase()
-  const readExtensions = ['pdf', 'jpg', 'jpeg', 'png']
+  const readExtensions = ['pdf', 'docx', 'jpg', 'jpeg', 'png']
   if (!readExtensions.includes(ext)) {
-    toast.error('仅支持 PDF、JPG、PNG')
+    toast.error('仅支持 PDF、DOCX、JPG、PNG')
     e.target.value = ''
     return
   }

@@ -3,13 +3,13 @@ import { apiId, buildSubmitBody } from '@/lib/questionnairePayload.mjs'
 export { buildAnswersJson } from '@/lib/questionnairePayload.mjs'
 
 /** 与后端 upload.allowed-extensions 一致 */
-export const ALLOWED_UPLOAD_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png']
+export const ALLOWED_UPLOAD_EXTENSIONS = ['pdf', 'docx', 'jpg', 'jpeg', 'png']
 
 export function validateQuestionnaireUploadFile(file) {
   if (!file) return '请选择文件'
   const ext = file.name.split('.').pop()?.toLowerCase() || ''
   if (!ALLOWED_UPLOAD_EXTENSIONS.includes(ext)) {
-    return '仅支持 PDF、JPG、PNG'
+    return '仅支持 PDF、DOCX、JPG、PNG'
   }
   if (file.size > 20 * 1024 * 1024) {
     return '单文件不超过 20MB'

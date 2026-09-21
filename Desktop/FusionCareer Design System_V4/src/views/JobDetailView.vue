@@ -138,7 +138,7 @@
                 </div>
                 <div class="resume-picker-section-label" style="margin-top:.6rem">或上传本地文件</div>
                 <div class="resume-picker-item resume-picker-upload" @click="triggerFile(q.id)">
-                  <input type="file" style="display:none" :ref="el => { fileRefs[q.id] = el }" accept=".pdf,.jpg,.jpeg,.png" @change="e => handleFile(q.id, e)" />
+                  <input type="file" style="display:none" :ref="el => { fileRefs[q.id] = el }" accept=".pdf,.docx,.jpg,.jpeg,.png" @change="e => handleFile(q.id, e)" />
                   <i class="ti ti-cloud-upload" />
                   <span>点击上传新简历（PDF / Word）</span>
                 </div>
