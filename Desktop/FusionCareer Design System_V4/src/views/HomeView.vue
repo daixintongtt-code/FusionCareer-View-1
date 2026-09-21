@@ -207,8 +207,13 @@
         </div>
 
         <!-- 分页 -->
-        <div class="pagination">
-          <button v-for="n in totalPages" :key="n" :class="['page-btn', n===page&&'active']" @click="goPage(n)">{{ n }}</button>
+        <div v-if="totalPages > 1" class="pagination" aria-label="岗位列表分页">
+          <button class="page-btn page-nav" :disabled="page===1" @click="goPage(page-1)">上一页</button>
+          <template v-for="(item, index) in paginationItems" :key="`${item}-${index}`">
+            <span v-if="item==='ellipsis'" class="page-ellipsis" aria-hidden="true">…</span>
+            <button v-else :class="['page-btn', item===page&&'active']" :aria-current="item===page?'page':undefined" @click="goPage(item)">{{ item }}</button>
+          </template>
+          <button class="page-btn page-nav" :disabled="page===totalPages" @click="goPage(page+1)">下一页</button>
         </div>
 
       </div>
@@ -422,6 +427,16 @@ const pageSize   = 10
 const sortBy     = ref('newest')
 const loading    = ref(false)
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
+const paginationItems = computed(() => {
+  const readTotal = totalPages.value
+  const readPage = page.value
+  if (readTotal <= 7) return Array.from({ length: readTotal }, (_, readIndex) => readIndex + 1)
+  if (readPage <= 4) return [1, 2, 3, 4, 5, 'ellipsis', readTotal]
+  if (readPage >= readTotal - 3) {
+    return [1, 'ellipsis', readTotal - 4, readTotal - 3, readTotal - 2, readTotal - 1, readTotal]
+  }
+  return [1, 'ellipsis', readPage - 1, readPage, readPage + 1, 'ellipsis', readTotal]
+})
 
 function setSort(s) { sortBy.value = s; page.value = 1; loadJobs() }
 function goPage(n)  { page.value = n; loadJobs() }
@@ -778,6 +793,12 @@ onUnmounted(() => window.removeEventListener('focus', loadRecommendations))
   transition: color var(--t); padding: 0 .2rem; margin-left: .1rem;
 }
 .chips-clear:hover { color: var(--red); }
+
+.page-nav { width: auto; min-width: 3.6rem; padding: 0 .7rem; }
+.page-ellipsis {
+  min-width: 1.5rem; text-align: center; color: var(--ink-3);
+  font-size: .8rem; user-select: none;
+}
 
 /* ── Job card ── */
 .job-card {

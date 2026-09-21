@@ -2020,7 +2020,7 @@ async function exportData() {
 .smart-entry-icon i { font-size: 1.1rem; }
 .smart-entry-title { font-size: .94rem; font-weight: 700; color: var(--ink); display: flex; align-items: center; gap: .45rem; }
 .smart-entry-desc { font-size: .78rem; color: var(--ink-2); line-height: 1.55; margin-top: .22rem; }
-.smart-source-input { min-height: 168px; resize: vertical; line-height: 1.65; padding: .8rem .9rem; background: var(--bg-card); }
+.smart-source-input { min-height: 210px; resize: vertical; line-height: 1.65; padding: .8rem .9rem; background: var(--bg-card); }
 .smart-entry-actions {
   display: flex; align-items: center; justify-content: space-between; gap: .75rem;
   margin-top: auto; padding-top: .875rem;

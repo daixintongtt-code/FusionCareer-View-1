@@ -67,10 +67,10 @@
           <template v-if="view==='resume'">
             <div class="card card-p">
               <div class="panel-title"><i class="ti ti-file-description" />简历正文</div>
-              <div class="grid-2">
+              <div ref="resumeContentGrid" class="grid-2">
                 <div v-for="item in resumeFields" :key="item.key" class="form-group">
                   <label class="form-label">{{ item.label }}</label>
-                  <textarea class="form-control" style="min-height:110px" v-model="resumeForm[item.key]" />
+                  <textarea class="form-control resume-content-input" v-model="resumeForm[item.key]" @input="resizeResumeTextarea" />
                 </div>
               </div>
               <div style="display:flex;justify-content:flex-end;margin:1rem 0 1.5rem">
@@ -238,7 +238,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import UserNavbar from '@/components/UserNavbar.vue'
 import AppToast from '@/components/AppToast.vue'
@@ -275,6 +275,12 @@ const validViews = ['info', 'resume', 'applications']
 const view = ref(validViews.includes(route.query.tab) ? route.query.tab : 'info')
 watch(() => route.query.tab, (t) => {
   view.value = validViews.includes(t) ? t : 'info'
+})
+watch(view, async (readView) => {
+  if (readView === 'resume') {
+    await nextTick()
+    resizeResumeTextareas()
+  }
 })
 
 onMounted(() => {
@@ -361,6 +367,18 @@ const resumeFields = [
   { key:'remark', label:'备注' },
 ]
 const resumeForm = ref(Object.fromEntries(resumeFields.map(readField => [readField.key, ''])))
+const resumeContentGrid = ref(null)
+
+function resizeResumeTextarea(readEventOrElement) {
+  const readTextarea = readEventOrElement?.target || readEventOrElement
+  if (!readTextarea) return
+  readTextarea.style.height = 'auto'
+  readTextarea.style.height = `${Math.max(110, readTextarea.scrollHeight)}px`
+}
+
+function resizeResumeTextareas() {
+  resumeContentGrid.value?.querySelectorAll('textarea').forEach(resizeResumeTextarea)
+}
 
 async function loadResume() {
   try {
@@ -368,6 +386,8 @@ async function loadResume() {
     resumeFields.forEach(readField => {
       resumeForm.value[readField.key] = readResume?.[readField.key] || ''
     })
+    await nextTick()
+    resizeResumeTextareas()
   } catch (readError) {
     toast.error(readError?.message || '加载简历失败')
   }
@@ -675,6 +695,7 @@ function cancelDeleteResume() {
 .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem 1.55rem; }
 .form-label { display: block; font-size: .98rem; font-weight: 650; margin-bottom: .58rem; color: var(--ink); }
 .form-control { width: 100%; min-height: 56px; border-radius: 16px; font-size: 1rem; padding: 0 1.1rem; }
+.resume-content-input { min-height: 110px; padding-top: .9rem; padding-bottom: .9rem; resize: vertical; overflow-y: hidden; }
 .btn { min-height: 46px; padding: 0 1.3rem; border-radius: 14px; font-size: .98rem; }
 
 .resume-row { display: flex; align-items: center; gap: 1.25rem; padding: 1.25rem 1.35rem; background: var(--bg-soft); border: 1px solid var(--border); border-radius: 20px; margin-bottom: .95rem; }
