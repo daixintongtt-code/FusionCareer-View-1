@@ -155,6 +155,37 @@
             </div>
           </template>
 
+          <!-- 我的收藏 -->
+          <template v-if="view==='favorites'">
+            <div class="card card-p">
+              <div class="panel-title favorites-panel-title">
+                <span><i class="ti ti-heart" />我的收藏</span>
+                <small>{{ favorites.length }} 个岗位</small>
+              </div>
+              <div v-if="favorites.length" class="profile-favorites">
+                <article v-for="favoriteJob in favorites" :key="favoriteJob.id" class="profile-favorite-row">
+                  <JobCategoryIcon :category="favoriteJob.jobCategory || favoriteJob.category" :size="44" />
+                  <div class="profile-favorite-main" @click="router.push(`/job/${favoriteJob.id}`)">
+                    <strong>{{ favoriteJob.positionName || favoriteJob.title }}</strong>
+                    <span>{{ favoriteJob.companyName || favoriteJob.company }}</span>
+                    <div>
+                      <em v-if="favoriteJob.workCity || favoriteJob.city"><i class="ti ti-map-pin" />{{ favoriteJob.workCity || favoriteJob.city }}</em>
+                      <em v-if="favoriteJob.salaryDisplay"><i class="ti ti-coin" />{{ favoriteJob.salaryDisplay }}</em>
+                    </div>
+                  </div>
+                  <button class="profile-favorite-remove" type="button" title="取消收藏" @click="removeSavedJob(favoriteJob.id)"><i class="ti ti-heart-filled" /></button>
+                  <button class="btn btn-secondary btn-sm" type="button" @click="router.push(`/job/${favoriteJob.id}`)">查看岗位</button>
+                </article>
+              </div>
+              <div v-else class="profile-favorites-empty">
+                <div><i class="ti ti-heart" /></div>
+                <strong>暂时没有收藏岗位</strong>
+                <span>在岗位列表或岗位详情页点击心形按钮，即可加入收藏。</span>
+                <RouterLink class="btn btn-primary" to="/home"><i class="ti ti-search" />浏览岗位</RouterLink>
+              </div>
+            </div>
+          </template>
+
         </div>
       </div>
     </div>
@@ -238,7 +269,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import UserNavbar from '@/components/UserNavbar.vue'
 import AppToast from '@/components/AppToast.vue'
@@ -246,6 +277,7 @@ import JobCategoryIcon from '@/components/JobCategoryIcon.vue'
 import { useToast } from '@/composables/useToast'
 import { logoutUser, readUser } from '@/lib/auth'
 import { downloadFile as downloadBlob, readJson, uploadForm } from '@/lib/api'
+import { readFavorites, removeFavorite, subscribeFavorites } from '@/lib/favorites'
 import {
   applyParsedToProfileForm,
   canEditApplication,
@@ -271,18 +303,21 @@ const EDU_LEVEL_OPTIONS = [
   { label: '博士研究生',    value: 'DOCTORAL' },
 ]
 
-const validViews = ['info', 'resume', 'applications']
+const validViews = ['info', 'resume', 'applications', 'favorites']
 const view = ref(validViews.includes(route.query.tab) ? route.query.tab : 'info')
 watch(() => route.query.tab, (t) => {
   view.value = validViews.includes(t) ? t : 'info'
 })
 onMounted(() => {
+  favorites.value = readFavorites()
+  unsubscribeFavorites = subscribeFavorites(items => { favorites.value = items })
   loadProfile()
   loadResume()
   loadFiles()
   loadQuota()
   loadApplications()
 })
+onBeforeUnmount(() => unsubscribeFavorites?.())
 
 function switchView(nextView) {
   if (!validViews.includes(nextView)) return
@@ -297,7 +332,15 @@ const navItems = [
   { view:'info',         label:'我的资料', icon:'ti-user-circle' },
   { view:'resume',       label:'我的简历', icon:'ti-file-text' },
   { view:'applications', label:'我的投递', icon:'ti-send' },
+  { view:'favorites',    label:'我的收藏', icon:'ti-heart' },
 ]
+
+const favorites = ref([])
+let unsubscribeFavorites = null
+function removeSavedJob(readJobId) {
+  removeFavorite(readJobId)
+  toast.success('已取消收藏')
+}
 
 // ── 个人资料（对齐后端字段名）──
 const form = ref({ realName:'', sid:'', gender:'', birthDate:'', politicalStatus:'',
@@ -722,6 +765,22 @@ function cancelDeleteResume() {
 .app-row { display: flex; align-items: center; gap: 1.2rem; padding: 1.22rem 1.35rem; border: 1px solid var(--border); border-radius: 20px; margin-bottom: .95rem; cursor: pointer; transition: all var(--t); }
 .app-row:hover { border-color: var(--border-mid); transform: translateY(-1px); box-shadow: 0 10px 24px rgba(0,0,0,.045); }
 .job-logo { width: 44px !important; height: 44px !important; border-radius: 16px; font-size: 1.12rem; font-weight: 800; }
+.favorites-panel-title { justify-content:space-between; }
+.favorites-panel-title>span { display:flex; align-items:center; gap:.65rem; }
+.favorites-panel-title small { color:var(--ink-3); font-size:.78rem; font-weight:500; }
+.profile-favorites { display:flex; flex-direction:column; gap:.8rem; }
+.profile-favorite-row { display:flex; align-items:center; gap:1rem; padding:1rem 1.1rem; border:1px solid var(--border); border-radius:18px; background:var(--bg-card); transition:all var(--t); }
+.profile-favorite-row:hover { border-color:var(--red-border); box-shadow:0 8px 22px rgba(0,0,0,.045); transform:translateY(-1px); }
+.profile-favorite-main { flex:1; min-width:0; cursor:pointer; }
+.profile-favorite-main strong { display:block; color:var(--ink); font-size:.9rem; line-height:1.4; }
+.profile-favorite-main>span { display:block; margin-top:.16rem; color:var(--ink-2); font-size:.78rem; }
+.profile-favorite-main>div { display:flex; flex-wrap:wrap; gap:.6rem; margin-top:.35rem; }
+.profile-favorite-main em { display:inline-flex; align-items:center; gap:.25rem; color:var(--ink-3); font-size:.7rem; font-style:normal; }
+.profile-favorite-remove { width:38px; height:38px; display:grid; place-items:center; flex-shrink:0; border:1px solid var(--red-border); border-radius:50%; color:var(--red); background:var(--red-light); cursor:pointer; }
+.profile-favorites-empty { display:flex; flex-direction:column; align-items:center; padding:3rem 1rem; text-align:center; }
+.profile-favorites-empty>div { width:62px; height:62px; display:grid; place-items:center; border-radius:50%; color:var(--red); background:var(--red-light); font-size:1.6rem; }
+.profile-favorites-empty strong { margin-top:.9rem; color:var(--ink); font-size:1rem; }
+.profile-favorites-empty span { margin:.35rem 0 1.1rem; color:var(--ink-3); font-size:.78rem; }
 
 .fade-enter-active, .fade-leave-active { transition: opacity .2s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
@@ -761,5 +820,10 @@ function cancelDeleteResume() {
   .profile-layout { grid-template-columns: 1fr; }
   .profile-layout > div:first-child .card-p { min-height: auto; position: static; }
   .grid-2 { grid-template-columns: 1fr; }
+}
+@media (max-width:640px) {
+  .profile-favorite-row { align-items:flex-start; flex-wrap:wrap; }
+  .profile-favorite-main { min-width:calc(100% - 110px); }
+  .profile-favorite-row>.btn { width:100%; justify-content:center; }
 }
 </style>

@@ -21,6 +21,10 @@
                 <div style="font-size:1.15rem;font-weight:700;color:var(--ink);margin-bottom:.2rem">{{ job.positionName }}</div>
                 <div style="font-size:.867rem;color:var(--ink-2)">{{ job.companyName }}</div>
               </div>
+              <button :class="['detail-favorite', favorite && 'active']" type="button" @click="toggleCurrentFavorite">
+                <i :class="['ti', favorite ? 'ti-heart-filled' : 'ti-heart']" />
+                {{ favorite ? '已收藏' : '收藏岗位' }}
+              </button>
             </div>
           </div>
           <!-- 基本信息 -->
@@ -157,7 +161,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onBeforeUnmount, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import UserNavbar from '@/components/UserNavbar.vue'
 import AppToast from '@/components/AppToast.vue'
@@ -165,6 +169,7 @@ import JobCategoryIcon from '@/components/JobCategoryIcon.vue'
 import { useToast } from '@/composables/useToast'
 import { formatCities, formatEducation } from '@/lib/jobRequirements.mjs'
 import { readJson } from '@/lib/api'
+import { isFavorite, subscribeFavorites, toggleFavorite } from '@/lib/favorites'
 import {
   applyParsedToDetailForm,
   loadMyAnswerRecord,
@@ -189,6 +194,14 @@ const answers = ref({})
 const fileAnswers = ref({})
 const fileRefs = {}
 const questionnaireExpired = ref(false)
+const favorite = ref(false)
+let unsubscribeFavorites = null
+
+function toggleCurrentFavorite() {
+  if (!job.value) return
+  favorite.value = toggleFavorite(job.value)
+  toast.success(favorite.value ? '已加入收藏夹' : '已取消收藏')
+}
 
 // 从接口加载当前用户的简历文件列表
 const myResumes = ref([])
@@ -305,9 +318,12 @@ async function submitApply() {
 }
 
 onMounted(() => {
+  favorite.value = isFavorite(route.params.id)
+  unsubscribeFavorites = subscribeFavorites(() => { favorite.value = isFavorite(route.params.id) })
   loadJob()
   loadMyResumes()
 })
+onBeforeUnmount(() => unsubscribeFavorites?.())
 
 // loadJob 内部加载完岗位后再加载题目
 async function loadJob() {
@@ -329,6 +345,8 @@ async function loadJob() {
 .detail-layout > div { min-width: 0; }
 .detail-layout .card { overflow-wrap: anywhere; }
 .apply-sidebar { position:sticky; top:calc(var(--nav-h) + 1rem); }
+.detail-favorite { margin-left:auto; display:inline-flex; align-items:center; gap:.35rem; padding:.45rem .7rem; border:1px solid var(--border); border-radius:999px; color:var(--ink-2); background:var(--bg-card); font-size:.75rem; cursor:pointer; transition:all var(--t); }
+.detail-favorite:hover,.detail-favorite.active { color:var(--red); border-color:var(--red-border); background:var(--red-light); }
 .ds-title { font-size:.867rem; font-weight:600; color:var(--ink); margin-bottom:.65rem; display:flex; align-items:center; gap:.4rem; }
 .ds-title i { color:var(--red); }
 .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:.4rem .75rem; margin-bottom:1rem; }

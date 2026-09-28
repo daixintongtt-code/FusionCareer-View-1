@@ -199,6 +199,12 @@
               </div>
             </div>
             <span class="job-dl">截止 {{ j.dl }}</span>
+            <button
+              type="button"
+              :class="['job-favorite-btn', favoriteIds.includes(String(j.id)) && 'active']"
+              :title="favoriteIds.includes(String(j.id)) ? '取消收藏' : '收藏岗位'"
+              @click.prevent.stop="toggleJobFavorite(j)"
+            ><i :class="['ti', favoriteIds.includes(String(j.id)) ? 'ti-heart-filled' : 'ti-heart']" /></button>
           </RouterLink>
 
           <div v-if="!jobs.length" style="text-align:center;padding:2.5rem;color:var(--ink-3);font-size:var(--fs-md)">
@@ -230,12 +236,31 @@ import JobCategoryIcon from '@/components/JobCategoryIcon.vue'
 import { useToast } from '@/composables/useToast'
 import { readJson } from '@/lib/api'
 import { formatCities } from '@/lib/jobRequirements.mjs'
+import { readFavorites, subscribeFavorites, toggleFavorite } from '@/lib/favorites'
 
 const router = useRouter()
 const toast = useToast()
 const offset = ref(0)
 const CARD_W = 208
 const featured = ref([])
+const favoriteIds = ref([])
+let unsubscribeFavorites = null
+
+function syncFavorites(items = readFavorites()) {
+  favoriteIds.value = items.map(item => String(item.id))
+}
+
+function toggleJobFavorite(readJob) {
+  const saved = toggleFavorite({
+    id:readJob.id,
+    jobCategory:readJob.category,
+    positionName:readJob.title,
+    companyName:readJob.company,
+    workCity:readJob.city,
+    applicationDeadline:readJob.dl,
+  })
+  toast.success(saved ? '已加入收藏夹' : '已取消收藏')
+}
 function slide(dir) {
   const min = -(Math.max(featured.value.length - 3, 0)) * CARD_W
   offset.value = Math.max(Math.min(offset.value - dir * CARD_W, 0), min)
@@ -585,11 +610,16 @@ async function loadRecommendations() {
 }
 
 onMounted(() => {
+  syncFavorites()
+  unsubscribeFavorites = subscribeFavorites(syncFavorites)
   loadJobs()
   loadRecommendations()
   window.addEventListener('focus', loadRecommendations)
 })
-onUnmounted(() => window.removeEventListener('focus', loadRecommendations))
+onUnmounted(() => {
+  window.removeEventListener('focus', loadRecommendations)
+  unsubscribeFavorites?.()
+})
 </script>
 
 <style scoped>
@@ -818,6 +848,9 @@ onUnmounted(() => window.removeEventListener('focus', loadRecommendations))
 .job-meta span { font-size:.75rem; color:var(--ink-2); }
 .job-l2tags { display:flex; gap:.25rem; flex-wrap:wrap; margin-top:.25rem; }
 .job-dl { font-size:.7rem; color:var(--ink-3); white-space:nowrap; flex-shrink:0; }
+.job-favorite-btn { width:34px; height:34px; display:grid; place-items:center; flex-shrink:0; border:1px solid var(--border); border-radius:50%; color:var(--ink-3); background:var(--bg-card); cursor:pointer; transition:all var(--t); }
+.job-favorite-btn:hover { color:var(--red); border-color:var(--red-border); background:var(--red-light); transform:scale(1.04); }
+.job-favorite-btn.active { color:var(--red); border-color:var(--red-border); background:var(--red-light); }
 </style>
 
 <style>
