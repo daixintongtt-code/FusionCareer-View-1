@@ -49,8 +49,26 @@
                 <div class="form-group"><label class="form-label">手机号</label><input class="form-control" v-model="form.phone" placeholder="请填写手机号" /></div>
                 <div class="form-group"><label class="form-label">微信号</label><input class="form-control" v-model="form.wechat" /></div>
                 <div class="form-group"><label class="form-label">生源地</label><input class="form-control" v-model="form.hometown" /></div>
-                <div class="form-group"><label class="form-label">就业意向排序</label><input class="form-control" v-model="form.intentionOrder" placeholder="如：新闻媒体,企业公司" /></div>
-                <div class="form-group"><label class="form-label">意向城市</label><input class="form-control" v-model="form.intentionCityText" placeholder="如：上海,北京" /></div>
+                <div class="form-group span-2">
+                  <label class="form-label">就业意向</label>
+                  <MultiLevelTagPicker
+                    v-model="form.intentionOrders"
+                    :options="JOB_INTENTION_OPTIONS"
+                    menu-title="新增就业意向"
+                    placeholder=""
+                    hint="可选择任意层级，例如“学术教职”或“企业公司-外企-宣传岗”。"
+                  />
+                </div>
+                <div class="form-group span-2">
+                  <label class="form-label">意向城市</label>
+                  <MultiLevelTagPicker
+                    v-model="form.intentionCities"
+                    :options="CITY_INTENTION_OPTIONS"
+                    menu-title="新增意向城市"
+                    placeholder=""
+                    hint="可选择省份或城市，例如“山东”或“山东-威海”。"
+                  />
+                </div>
                 <div class="form-group"><label class="form-label">当前心态</label>
                   <select class="form-control" v-model="form.mindset"><option value="">未填写</option><option value="CONFIDENT">比较有把握</option><option value="CAUTIOUSLY_OPTIMISTIC">谨慎乐观</option><option value="LACK_OF_CONFIDENCE">信心不足</option><option value="VERY_ANXIOUS">非常焦虑</option><option value="ZEN_WAITING">佛系等待</option></select>
                 </div>
@@ -274,10 +292,18 @@ import { useRoute, useRouter } from 'vue-router'
 import UserNavbar from '@/components/UserNavbar.vue'
 import AppToast from '@/components/AppToast.vue'
 import JobCategoryIcon from '@/components/JobCategoryIcon.vue'
+import MultiLevelTagPicker from '@/components/MultiLevelTagPicker.vue'
 import { useToast } from '@/composables/useToast'
 import { logoutUser, readUser } from '@/lib/auth'
 import { downloadFile as downloadBlob, readJson, uploadForm } from '@/lib/api'
 import { readFavorites, removeFavorite, subscribeFavorites } from '@/lib/favorites'
+import {
+  CITY_INTENTION_OPTIONS,
+  JOB_INTENTION_OPTIONS,
+  parsePreferenceList,
+  serializeCityIntentions,
+  serializeJobIntentions,
+} from '@/lib/profilePreferences.mjs'
 import {
   applyParsedToProfileForm,
   canEditApplication,
@@ -345,16 +371,7 @@ function removeSavedJob(readJobId) {
 // ── 个人资料（对齐后端字段名）──
 const form = ref({ realName:'', sid:'', gender:'', birthDate:'', politicalStatus:'',
   phone:'', email:'', wechat:'', hometown:'', grade:'', major:'', eduLevel:'', supervisor:'',
-  intentionOrder:'', intentionCityText:'', intentionDream:'', mindset:'' })
-
-function parseCities(readValue) {
-  try {
-    const readCities = JSON.parse(readValue || '[]')
-    return Array.isArray(readCities) ? readCities.join(',') : ''
-  } catch {
-    return ''
-  }
-}
+  intentionOrders:[], intentionCities:[], intentionDream:'', mindset:'' })
 
 async function loadProfile() {
   try {
@@ -369,8 +386,9 @@ async function loadProfile() {
       email: readValue.email || '', wechat: readValue.wechat || '',
       hometown: readValue.hometown || '', grade: readValue.grade || '',
       major: readValue.major || '', eduLevel: readValue.eduLevel || '',
-      supervisor: readValue.supervisor || '', intentionOrder: readValue.intentionOrder || '',
-      intentionCityText: parseCities(readValue.intentionCity),
+      supervisor: readValue.supervisor || '',
+      intentionOrders: parsePreferenceList(readValue.intentionOrder),
+      intentionCities: parsePreferenceList(readValue.intentionCity),
       intentionDream: readValue.intentionDream || '', mindset: readValue.mindset || '',
     }
   } catch (readError) {
@@ -381,9 +399,10 @@ async function saveProfile() {
   try {
     const updateProfile = { ...form.value }
     delete updateProfile.sid
-    updateProfile.intentionCity = JSON.stringify(updateProfile.intentionCityText
-      .split(',').map(readCity => readCity.trim()).filter(Boolean))
-    delete updateProfile.intentionCityText
+    updateProfile.intentionOrder = serializeJobIntentions(updateProfile.intentionOrders)
+    updateProfile.intentionCity = serializeCityIntentions(updateProfile.intentionCities)
+    delete updateProfile.intentionOrders
+    delete updateProfile.intentionCities
     Object.keys(updateProfile).forEach(readKey => {
       if (updateProfile[readKey] === '') updateProfile[readKey] = null
     })
@@ -715,6 +734,7 @@ function cancelDeleteResume() {
 .panel-title { font-size: 1.18rem; font-weight: 800; color: var(--ink); margin-bottom: 1.55rem; display: flex; align-items: center; gap: .65rem; }
 .panel-title i { color: var(--red); font-size: 1.28rem; }
 .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem 1.55rem; }
+.span-2 { grid-column: span 2; }
 .form-label { display: block; font-size: .98rem; font-weight: 650; margin-bottom: .58rem; color: var(--ink); }
 .form-control { width: 100%; min-height: 56px; border-radius: 16px; font-size: 1rem; padding: 0 1.1rem; }
 .resume-content-list { display: flex; flex-direction: column; gap: 1.1rem; }
@@ -820,6 +840,7 @@ function cancelDeleteResume() {
   .profile-layout { grid-template-columns: 1fr; }
   .profile-layout > div:first-child .card-p { min-height: auto; position: static; }
   .grid-2 { grid-template-columns: 1fr; }
+  .span-2 { grid-column: span 1; }
 }
 @media (max-width:640px) {
   .profile-favorite-row { align-items:flex-start; flex-wrap:wrap; }
