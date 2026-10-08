@@ -613,7 +613,7 @@
                 <thead>
                   <tr>
                     <th class="col-check"><input type="checkbox" :checked="draftJobs.length>0 && draftJobs.every(j=>draftSelected.includes(j.id))" @change="e=>draftToggleAll(e.target.checked)" /></th>
-                    <th>岗位名称</th><th>公司</th><th>城市</th><th>投递截止</th><th>来源</th><th>操作</th>
+                    <th>岗位名称</th><th>公司</th><th>岗位大类</th><th>岗位小类</th><th>投递截止</th><th>来源</th><th>操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -621,7 +621,8 @@
                     <td class="col-check"><input type="checkbox" :checked="draftSelected.includes(j.id)" @change="draftToggleSel(j.id)" /></td>
                     <td><span style="font-weight:500;color:var(--ink)">{{ j.positionName }}</span></td>
                     <td>{{ j.companyName }}</td>
-                    <td>{{ formatCities(j) || '—' }}</td>
+                    <td>{{ JOB_CATEGORY_LABEL[j.jobCategory] || j.jobCategory || '—' }}</td>
+                    <td>{{ JOB_SUB_CATEGORY_LABEL[j.jobSubCategory] || j.jobSubCategory || '—' }}</td>
                     <td>{{ j.applicationDeadline || '—' }}</td>
                     <td>
                       <span v-if="j.sourceType==='CRAWL'" class="badge" style="background:var(--blue-bg,#eaf0fb);color:var(--blue,#1b4f9c);gap:3px;font-size:.7rem"><i class="ti ti-robot" style="font-size:9px" />自动导入</span>
@@ -1289,6 +1290,15 @@ const restoringJobId = ref(null)
 const STATUS_LABEL = { PUBLISHED:'发布中', OFFLINE:'未发布', EXPIRED:'已截止' }
 const STATUS_CLASS = { PUBLISHED:'badge-green', OFFLINE:'badge-gray', EXPIRED:'badge-amber' }
 const STATUS_ORDER = { PUBLISHED:0, OFFLINE:1, EXPIRED:2 }
+const JOB_CATEGORY_LABEL = {
+  ACADEMIC:'学术教职', GOVERNMENT:'党政机关', MEDIA:'新闻媒体', ENTERPRISE:'企业公司', OTHER:'其他',
+}
+const JOB_SUB_CATEGORY_LABEL = {
+  FURTHER_STUDY:'升学深造', TEACHING_POSITION:'考取教职', MIDDLE_SCHOOL_TEACHER:'中学教师',
+  SELECTED_GRADUATE:'选调生', CIVIL_SERVANT:'公务员', UNIVERSITY_ADMIN:'高校行政', HOSPITAL:'医院', BANK:'银行', OTHER_PUBLIC_INSTITUTION:'其他事业单位',
+  CENTRAL_MEDIA:'党报央媒', REGIONAL_MEDIA:'地区主流媒体', OTHER_MEDIA:'其他媒体机构', SELF_MEDIA:'自媒体',
+  STATE_OWNED:'国央企', PRIVATE_ENTERPRISE:'民企', FOREIGN_ENTERPRISE:'外企', OTHER:'其他',
+}
 
 async function loadJobs() {
   try {
