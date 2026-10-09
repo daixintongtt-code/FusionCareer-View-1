@@ -1,12 +1,12 @@
 <template>
   <div v-if="visible" class="ai-layer">
     <Transition name="ai-panel">
-      <section v-if="open" class="ai-panel" :style="panelStyle" aria-label="AI 求职助手">
+      <section v-if="open" :class="['ai-panel', isJobDetail && 'ai-panel-resume']" :style="panelStyle" aria-label="AI 求职助手">
         <header>
-          <div class="ai-brand"><span><i class="ti ti-sparkles" /></span><div><strong>{{ isHome ? '岗位推荐助手' : '复新 AI' }}</strong><small>{{ isHome ? '根据你的偏好寻找合适机会' : '你的求职与简历助手' }}</small></div></div>
+          <div class="ai-brand"><span><i class="ti ti-sparkles" /></span><div><strong>{{ assistantTitle }}</strong><small>{{ assistantSubtitle }}</small></div></div>
           <button type="button" aria-label="关闭" @click="open=false"><i class="ti ti-x" /></button>
         </header>
-        <div v-if="route.params.id" class="ai-context"><i class="ti ti-briefcase" />可结合当前岗位为你提供建议</div>
+        <div v-if="isJobDetail" class="ai-context"><i class="ti ti-briefcase" /><span v-if="currentJob">正在针对「{{ currentJob.positionName }} · {{ currentJob.companyName }}」优化</span><span v-else>正在读取当前岗位信息…</span></div>
         <div class="ai-body">
           <template v-if="isHome">
             <div class="assistant-message"><i class="ti ti-sparkles" /><div>先告诉我你感兴趣的就业方向吧，可以多选。</div></div>
@@ -53,6 +53,46 @@
               <button class="recommend-restart" type="button" @click="resetRecommendation"><i class="ti ti-refresh" />重新选择</button>
             </template>
           </template>
+          <template v-else-if="isJobDetail">
+            <div v-if="!resumeAdvice" class="resume-advice-start">
+              <div class="assistant-message resume-intro"><i class="ti ti-file-search" /><div><strong>选择要检查的简历</strong><span>AI 会对照当前岗位要求，给出匹配判断、证据与可直接落地的修改建议。</span></div></div>
+
+              <div class="resume-source-title"><span>从我的简历选择</span><button type="button" :disabled="resumeFilesLoading" @click="loadResumeFiles"><i class="ti ti-refresh" />刷新</button></div>
+              <div v-if="resumeFilesLoading" class="resume-files-state"><i class="ti ti-loader-2" />正在加载我的简历…</div>
+              <div v-else-if="resumeFiles.length" class="resume-file-grid">
+                <button v-for="readFile in resumeFiles" :key="readFile.id" type="button" :class="['resume-file-card', selectedResume?.type==='stored' && selectedResume.id===readFile.id && 'selected']" @click="selectStoredResume(readFile)">
+                  <span class="resume-file-icon"><i :class="['ti', resumeIcon(readFile.name)]" /></span>
+                  <span class="resume-file-copy"><strong>{{ readFile.name }}</strong><small>{{ formatFileMeta(readFile) }}</small></span>
+                  <i v-if="selectedResume?.type==='stored' && selectedResume.id===readFile.id" class="ti ti-circle-check-filled resume-selected-mark" />
+                </button>
+              </div>
+              <div v-else class="resume-files-state resume-files-empty"><i class="ti ti-file-off" /><span>还没有已上传的简历，也可以直接上传本地文件。</span></div>
+
+              <div class="resume-divider"><span>或实时上传</span></div>
+              <label :class="['resume-upload', selectedResume?.type==='upload' && 'selected']">
+                <input ref="resumeFileInput" type="file" :accept="RESUME_ADVICE_ACCEPT" @change="handleResumeFile" />
+                <span class="resume-upload-icon"><i :class="['ti', selectedResume?.type==='upload' ? 'ti-file-check' : 'ti-cloud-upload']" /></span>
+                <span><strong>{{ selectedResume?.type==='upload' ? selectedResume.name : '点击选择简历文件' }}</strong><small>支持 PDF、DOCX、JPG、JPEG、PNG，最大 20 MB</small></span>
+                <i class="ti ti-chevron-right" />
+              </label>
+              <div v-if="resumeFileError" class="resume-file-error"><i class="ti ti-alert-circle" />{{ resumeFileError }}</div>
+
+              <button class="resume-analyze" type="button" :disabled="!selectedResume || resumeAdviceLoading" @click="submitResumeAdvice">
+                <i :class="['ti', resumeAdviceLoading ? 'ti-loader-2' : 'ti-sparkles']" />{{ resumeAdviceLoading ? '正在分析岗位与简历…' : '生成简历修改建议' }}
+              </button>
+              <div v-if="resumeAdviceError" class="recommend-error resume-advice-error"><i class="ti ti-alert-circle" />{{ resumeAdviceError }}<button type="button" @click="submitResumeAdvice">重试</button></div>
+              <p class="resume-privacy"><i class="ti ti-lock" />简历仅用于本次分析，请勿提交与求职无关的敏感信息</p>
+            </div>
+
+            <div v-else class="resume-advice-result">
+              <div class="resume-result-head">
+                <div><span class="resume-result-kicker"><i class="ti ti-circle-check-filled" />分析完成</span><strong>{{ selectedResume?.name }}</strong><small>{{ currentJob ? `${currentJob.positionName} · ${currentJob.companyName}` : '当前岗位' }}</small></div>
+                <button type="button" @click="resetResumeAdvice"><i class="ti ti-switch-horizontal" />更换简历</button>
+              </div>
+              <ResumeAdviceRenderer :markdown="resumeAdvice.markdown" />
+              <button class="resume-regenerate" type="button" :disabled="resumeAdviceLoading" @click="submitResumeAdvice"><i class="ti ti-refresh" />重新生成</button>
+            </div>
+          </template>
           <template v-else>
             <div class="ai-welcome"><strong>你好，我是你的 AI 求职助手</strong><span>后续接入模型后，你可以直接告诉我想解决的问题。</span></div>
             <div class="ai-capabilities">
@@ -67,16 +107,24 @@
         <footer><i class="ti ti-shield-check" />AI 建议仅供参考，请结合实际情况判断</footer>
       </section>
     </Transition>
-    <button ref="ball" class="ai-ball" :class="{dragging}" :style="ballStyle" type="button" aria-label="打开 AI 求职助手" @pointerdown="startDrag">
+    <button ref="ball" class="ai-ball" :class="{dragging}" :style="ballStyle" type="button" aria-label="打开 AI 求职助手" @pointerdown="startDrag" @click="toggleAssistant">
       <span /><i class="ti ti-sparkles" /><b>AI</b>
     </button>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { CITY_GROUPS, INTENTION_OPTIONS, requestJobRecommendations } from '@/lib/jobRecommendation.mjs'
+import { readJson } from '@/lib/api'
+import {
+  loadResumeAdviceFiles,
+  requestResumeAdvice,
+  RESUME_ADVICE_ACCEPT,
+  validateResumeAdviceFile,
+} from '@/lib/resumeAdvice.mjs'
+import ResumeAdviceRenderer from '@/components/ResumeAdviceRenderer.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -85,6 +133,9 @@ const dragging = ref(false)
 const position = ref({ x:null, y:null })
 const visible = computed(() => !route.path.startsWith('/login') && !route.path.startsWith('/admin'))
 const isHome = computed(() => route.path === '/home')
+const isJobDetail = computed(() => route.path.startsWith('/job/') && !!route.params.id)
+const assistantTitle = computed(() => isHome.value ? '岗位推荐助手' : isJobDetail.value ? '简历修改助手' : '复新 AI')
+const assistantSubtitle = computed(() => isHome.value ? '根据你的偏好寻找合适机会' : isJobDetail.value ? '对照当前岗位，逐项优化简历' : '你的求职与简历助手')
 const recommendStep = ref(1)
 const intentionValues = ref([])
 const cityValues = ref([])
@@ -93,6 +144,16 @@ const citySearch = ref('')
 const recommendations = ref([])
 const recommendLoading = ref(false)
 const recommendError = ref('')
+const currentJob = ref(null)
+const resumeFiles = ref([])
+const resumeFilesLoading = ref(false)
+const selectedResume = ref(null)
+const resumeFileInput = ref(null)
+const resumeFileError = ref('')
+const resumeAdvice = ref(null)
+const resumeAdviceLoading = ref(false)
+const resumeAdviceError = ref('')
+let suppressAssistantClick = false
 const intentionLabels = computed(() => INTENTION_OPTIONS.filter(item => intentionValues.value.includes(item.value)).map(item => item.label))
 const citySelectionSummary = computed(() => cityValues.value.length > 3
   ? `${cityValues.value.slice(0, 3).join('、')}等`
@@ -108,11 +169,87 @@ const filteredCityGroups = computed(() => {
 const ballStyle = computed(() => position.value.x == null ? {} : ({ left:`${position.value.x}px`, top:`${position.value.y}px`, right:'auto', bottom:'auto' }))
 const panelStyle = computed(() => {
   if (position.value.x == null) return {}
-  const width = Math.min(390, window.innerWidth - 24)
+  const width = Math.min(isJobDetail.value ? 720 : 390, window.innerWidth - 24)
   const left = Math.max(12, Math.min(window.innerWidth - width - 12, position.value.x - width + 56))
   const above = position.value.y > 470
   return { left:`${left}px`, right:'auto', top:above ? 'auto' : `${Math.min(position.value.y + 68, window.innerHeight - 470)}px`, bottom:above ? `${window.innerHeight - position.value.y + 12}px` : 'auto' }
 })
+
+async function loadCurrentJob() {
+  if (!isJobDetail.value) { currentJob.value = null; return }
+  try {
+    currentJob.value = await readJson(`/job/${route.params.id}`)
+  } catch {
+    currentJob.value = null
+  }
+}
+
+async function loadResumeFiles() {
+  if (!isJobDetail.value) return
+  resumeFilesLoading.value = true
+  try {
+    resumeFiles.value = await loadResumeAdviceFiles()
+  } catch (readError) {
+    resumeFiles.value = []
+    resumeFileError.value = readError?.message || '暂时无法加载已上传简历'
+  } finally {
+    resumeFilesLoading.value = false
+  }
+}
+
+function selectStoredResume(readFile) {
+  selectedResume.value = { type:'stored', id:readFile.id, name:readFile.name }
+  resumeFileError.value = ''
+  resumeAdviceError.value = ''
+  if (resumeFileInput.value) resumeFileInput.value.value = ''
+}
+
+function handleResumeFile(readEvent) {
+  const readFile = readEvent.target.files?.[0]
+  const readError = validateResumeAdviceFile(readFile)
+  if (readError) {
+    selectedResume.value = null
+    resumeFileError.value = readError
+    readEvent.target.value = ''
+    return
+  }
+  selectedResume.value = { type:'upload', file:readFile, name:readFile.name }
+  resumeFileError.value = ''
+  resumeAdviceError.value = ''
+}
+
+async function submitResumeAdvice() {
+  if (!selectedResume.value || !route.params.id) return
+  resumeAdviceLoading.value = true
+  resumeAdviceError.value = ''
+  try {
+    resumeAdvice.value = await requestResumeAdvice(route.params.id, selectedResume.value)
+  } catch (readError) {
+    resumeAdviceError.value = readError?.message || '简历分析服务暂时不可用'
+  } finally {
+    resumeAdviceLoading.value = false
+  }
+}
+
+function resetResumeAdvice() {
+  resumeAdvice.value = null
+  resumeAdviceError.value = ''
+}
+
+function resumeIcon(readName) {
+  const readValue = String(readName || '').toLowerCase()
+  if (readValue.endsWith('.pdf')) return 'ti-file-type-pdf'
+  if (/\.(jpg|jpeg|png)$/.test(readValue)) return 'ti-photo'
+  return 'ti-file-type-doc'
+}
+
+function formatFileMeta(readFile) {
+  const readExtension = String(readFile.name || '').split('.').pop().toUpperCase()
+  const readSize = Number(readFile.fileSize || 0)
+  if (!readSize) return readExtension || '简历文件'
+  const readLabel = readSize >= 1024 * 1024 ? `${(readSize / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(readSize / 1024))} KB`
+  return [readExtension, readLabel].filter(Boolean).join(' · ')
+}
 
 function startDrag(event) {
   if (event.button !== 0) return
@@ -133,11 +270,19 @@ function startDrag(event) {
   const end = () => {
     window.removeEventListener('pointermove', move)
     dragging.value = false
+    suppressAssistantClick = moved
     if (moved) localStorage.setItem('fusion-career-ai-position', JSON.stringify(position.value))
-    else open.value = !open.value
   }
   window.addEventListener('pointermove', move)
   window.addEventListener('pointerup', end, { once:true })
+}
+
+function toggleAssistant() {
+  if (suppressAssistantClick) {
+    suppressAssistantClick = false
+    return
+  }
+  open.value = !open.value
 }
 
 function toggleValue(readList, readValue) {
@@ -196,6 +341,20 @@ onMounted(() => {
     if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) position.value = saved
   } catch { /* 使用默认位置 */ }
 })
+
+watch(() => [open.value, route.fullPath], ([readOpen]) => {
+  if (!readOpen || !isJobDetail.value) return
+  loadCurrentJob()
+  loadResumeFiles()
+}, { immediate:true })
+
+watch(() => route.fullPath, () => {
+  currentJob.value = null
+  selectedResume.value = null
+  resumeAdvice.value = null
+  resumeAdviceError.value = ''
+  resumeFileError.value = ''
+})
 </script>
 
 <style scoped>
@@ -206,4 +365,5 @@ onMounted(() => {
 .city-select-trigger{display:grid;grid-template-columns:34px minmax(0,1fr) auto 16px;gap:.55rem;align-items:center;padding:.6rem .7rem;text-align:left;border-color:#e5d8bb;border-radius:13px;background:linear-gradient(135deg,#fff 0%,#fffcf5 100%);box-shadow:0 3px 10px rgba(92,65,14,.04)}.city-select-trigger:hover{border-color:rgba(184,135,30,.45);box-shadow:0 5px 16px rgba(92,65,14,.08)}.city-select-trigger.open{color:var(--ink);border-color:var(--gold);box-shadow:0 0 0 3px rgba(184,135,30,.1)}.city-trigger-icon{width:34px;height:34px;display:grid;place-items:center;border-radius:10px;color:#9a6d12;background:var(--gold-light)}.city-select-trigger.open .city-trigger-icon i{transform:none}.city-trigger-copy{display:flex;flex-direction:column;gap:.12rem;min-width:0}.city-trigger-copy strong{color:var(--ink);font-size:.72rem}.city-trigger-copy small{overflow:hidden;color:var(--ink-3);font-size:.6rem;text-overflow:ellipsis;white-space:nowrap}.city-select-trigger>b{min-width:20px;height:20px;display:grid;place-items:center;padding:0 .25rem;border-radius:999px;color:#fff;background:var(--gold);font-size:.58rem}.city-trigger-arrow{color:var(--ink-4);font-size:.7rem}.city-select-trigger.open .city-trigger-arrow{transform:rotate(180deg)}.city-select-menu{left:auto;right:0;width:min(330px,calc(100vw - 52px));top:calc(100% + 7px);padding:0;overflow:hidden;border-color:#e4dac4;border-radius:15px;box-shadow:0 18px 44px rgba(42,32,14,.16)}.city-menu-head{display:flex;align-items:center;justify-content:space-between;padding:.7rem .8rem .5rem}.city-menu-head>div{display:flex;align-items:center;gap:.4rem}.city-menu-head strong{color:var(--ink);font-size:.75rem}.city-menu-head small{padding:.1rem .35rem;border-radius:999px;color:#8a6418;background:var(--gold-light);font-size:.56rem}.city-menu-head>button{width:25px;height:25px;display:grid;place-items:center;border:0;border-radius:7px;color:var(--ink-3);background:var(--bg-soft);cursor:pointer}.city-search{margin:0 .7rem;padding:.48rem .6rem;border-color:var(--border);border-radius:9px;background:#faf9f6}.city-search:focus-within{border-color:rgba(184,135,30,.55);box-shadow:0 0 0 3px rgba(184,135,30,.08)}.city-search input{font-size:.65rem}.city-search>button{border:0;color:var(--ink-4);background:transparent;cursor:pointer}.city-scroll{max-height:245px;margin-top:.35rem;padding:0 .55rem .55rem}.city-scroll::-webkit-scrollbar{width:4px}.city-scroll::-webkit-scrollbar-thumb{border-radius:4px;background:#d7ccb4}.city-group-label{display:flex;align-items:center;gap:.35rem;padding:.5rem .2rem .3rem;color:#8c806b}.city-group-label::after{content:'';height:1px;flex:1;background:#f0ebe2}.city-group-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.25rem}.city-option{width:auto;justify-content:center;position:relative;padding:.38rem .25rem;border:1px solid transparent;text-align:center}.city-option:hover{color:#8a6418;border-color:#eadfc7;background:#fffaf0}.city-option.selected{color:#875f0f;border-color:#e3cb96;background:var(--gold-light);font-weight:600}.city-option.selected i{position:absolute;right:3px;top:3px;font-size:.55rem}.city-menu-foot{display:flex;align-items:center;justify-content:space-between;padding:.55rem .7rem;border-top:1px solid var(--border);background:#fcfbf8}.city-menu-foot span{color:var(--ink-3);font-size:.62rem}.city-menu-foot button{padding:.35rem .7rem;border:0;border-radius:8px;color:#fff;background:linear-gradient(120deg,#ad7d1d,#c39435);font-size:.65rem;font-weight:600;cursor:pointer}.selected-cities{margin-top:.5rem}.selected-cities>span{padding:.25rem .28rem .25rem .5rem;border:1px solid #ead9b4;background:#fff9eb}
 .ai-body{min-height:0;overscroll-behavior:contain}.city-select-menu{position:relative;left:0;right:auto;top:auto;width:100%;margin-top:.45rem}.city-scroll{height:min(245px,32vh);max-height:245px;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;scrollbar-gutter:stable}.city-scroll::-webkit-scrollbar{width:6px}.city-scroll::-webkit-scrollbar-track{background:#f7f3eb;border-radius:6px}.city-scroll::-webkit-scrollbar-thumb{background:#cdbb97;border:1px solid #f7f3eb;border-radius:6px}
 @media(max-height:720px){.ai-panel{max-height:calc(100vh - 100px)}.city-scroll{height:min(190px,27vh)}}
+.ai-panel-resume{width:min(720px,calc(100vw - 24px));max-height:min(790px,calc(100vh - 120px))}.ai-panel-resume .ai-body{padding:1rem 1.1rem 1.2rem}.resume-intro{margin-bottom:1rem}.resume-intro>div{display:flex;flex-direction:column;gap:.12rem}.resume-intro strong{color:var(--ink);font-size:.78rem}.resume-intro span{color:var(--ink-3);font-size:.67rem}.resume-source-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:.45rem}.resume-source-title>span{color:var(--ink-2);font-size:.7rem;font-weight:650}.resume-source-title>button{display:flex;align-items:center;gap:.2rem;padding:.2rem .35rem;border:0;color:var(--ink-3);background:transparent;font-size:.62rem;cursor:pointer}.resume-source-title>button:disabled{opacity:.55}.resume-file-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem}.resume-file-card{position:relative;display:grid;grid-template-columns:36px minmax(0,1fr) 18px;align-items:center;gap:.55rem;min-width:0;padding:.65rem;border:1px solid var(--border);border-radius:12px;text-align:left;background:#fff;cursor:pointer;transition:border-color var(--t),background var(--t),box-shadow var(--t)}.resume-file-card:hover{border-color:var(--red-border);box-shadow:0 5px 16px rgba(40,22,25,.06)}.resume-file-card.selected{border-color:var(--red);background:var(--red-light);box-shadow:0 0 0 2px rgba(164,31,51,.06)}.resume-file-icon{width:36px;height:36px;display:grid;place-items:center;border-radius:10px;color:var(--red);background:#fbecf0;font-size:1.05rem}.resume-file-copy{display:flex;flex-direction:column;gap:.12rem;min-width:0}.resume-file-copy strong{overflow:hidden;color:var(--ink);font-size:.68rem;text-overflow:ellipsis;white-space:nowrap}.resume-file-copy small{color:var(--ink-4);font-size:.58rem}.resume-selected-mark{color:var(--red);font-size:.9rem}.resume-files-state{display:flex;align-items:center;justify-content:center;gap:.35rem;min-height:64px;padding:.7rem;border:1px dashed var(--border-mid);border-radius:12px;color:var(--ink-3);background:var(--bg-soft);font-size:.66rem}.resume-files-state>i{animation:recommend-spin .8s linear infinite}.resume-files-empty>i{animation:none;font-size:1rem}.resume-divider{display:flex;align-items:center;gap:.55rem;margin:.85rem 0 .55rem;color:var(--ink-4);font-size:.6rem}.resume-divider::before,.resume-divider::after{content:'';height:1px;flex:1;background:var(--border)}.resume-upload{display:grid;grid-template-columns:38px minmax(0,1fr) 18px;align-items:center;gap:.6rem;padding:.67rem .72rem;border:1px dashed var(--border-mid);border-radius:12px;background:#fcfbf9;cursor:pointer;transition:all var(--t)}.resume-upload:hover,.resume-upload.selected{border-color:var(--red-border);background:var(--red-light)}.resume-upload input{display:none}.resume-upload-icon{width:38px;height:38px;display:grid;place-items:center;border-radius:11px;color:#9b6e15;background:var(--gold-light);font-size:1.05rem}.resume-upload>span:nth-child(3){display:flex;flex-direction:column;gap:.12rem;min-width:0}.resume-upload strong{overflow:hidden;color:var(--ink);font-size:.7rem;text-overflow:ellipsis;white-space:nowrap}.resume-upload small{color:var(--ink-3);font-size:.59rem}.resume-upload>i{color:var(--ink-4)}.resume-file-error{display:flex;align-items:center;gap:.3rem;margin-top:.45rem;color:#a4283d;font-size:.64rem}.resume-analyze{display:flex;align-items:center;justify-content:center;gap:.35rem;width:100%;margin-top:.85rem;padding:.64rem;border:0;border-radius:11px;color:#fff;background:linear-gradient(120deg,#9a1c32,#bd334d);font-size:.72rem;font-weight:650;cursor:pointer;box-shadow:0 7px 18px rgba(143,25,47,.18)}.resume-analyze:disabled{opacity:.48;box-shadow:none;cursor:not-allowed}.resume-analyze .ti-loader-2{animation:recommend-spin .8s linear infinite}.resume-advice-error{margin-top:.55rem}.resume-privacy{margin:.52rem 0 0;color:var(--ink-4);font-size:.59rem;text-align:center}.resume-privacy i{margin-right:.2rem}.resume-result-head{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:.8rem;padding:.75rem;border:1px solid #e4dac4;border-radius:13px;background:linear-gradient(135deg,#fffaf0,#fff)}.resume-result-head>div{display:flex;flex-direction:column;gap:.12rem;min-width:0}.resume-result-kicker{display:flex;align-items:center;gap:.25rem;color:#287044;font-size:.6rem;font-weight:650}.resume-result-head strong{overflow:hidden;color:var(--ink);font-size:.76rem;text-overflow:ellipsis;white-space:nowrap}.resume-result-head small{color:var(--ink-3);font-size:.62rem}.resume-result-head>button,.resume-regenerate{display:flex;align-items:center;justify-content:center;gap:.25rem;flex-shrink:0;padding:.38rem .55rem;border:1px solid var(--border-mid);border-radius:8px;color:var(--ink-2);background:#fff;font-size:.62rem;cursor:pointer}.resume-result-head>button:hover,.resume-regenerate:hover{color:var(--red);border-color:var(--red-border);background:var(--red-light)}.resume-regenerate{margin:1rem auto 0}.resume-regenerate:disabled{opacity:.45;cursor:not-allowed}@media(max-width:760px){.ai-panel-resume{left:12px!important;right:12px!important;bottom:86px;width:auto;max-height:calc(100vh - 105px)}.ai-panel-resume .ai-body{padding:.85rem}.resume-file-grid{grid-template-columns:1fr}.resume-result-head{align-items:flex-start}.resume-result-head>button{padding:.35rem}.resume-result-head>button i{margin:0}.resume-result-head>button{font-size:0}}
 </style>
