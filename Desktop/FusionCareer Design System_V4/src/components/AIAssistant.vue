@@ -7,7 +7,7 @@
           <button type="button" aria-label="关闭" @click="open=false"><i class="ti ti-x" /></button>
         </header>
         <div v-if="isJobDetail" class="ai-context"><i class="ti ti-briefcase" /><span v-if="currentJob">正在针对「{{ currentJob.positionName }} · {{ currentJob.companyName }}」优化</span><span v-else>正在读取当前岗位信息…</span></div>
-        <div class="ai-body">
+        <div ref="aiBody" class="ai-body">
           <template v-if="isHome">
             <div class="assistant-message"><i class="ti ti-sparkles" /><div>先告诉我你感兴趣的就业方向吧，可以多选。</div></div>
             <div class="recommend-options"><button v-for="option in INTENTION_OPTIONS" :key="option.value" type="button" :class="{selected:intentionValues.includes(option.value)}" @click="toggleValue(intentionValues, option.value)">{{ option.label }}</button></div>
@@ -31,7 +31,7 @@
                     </template>
                     <div v-if="!filteredCityGroups.length" class="city-no-result">没有找到相关城市</div>
                   </div>
-                  <div class="city-menu-foot"><span>已选择 {{ cityValues.length }} 项</span><button type="button" @click="cityDropdownOpen=false">完成选择</button></div>
+                  <div ref="cityMenuFoot" class="city-menu-foot"><span>已选择 {{ cityValues.length }} 项</span><button type="button" @click="cityDropdownOpen=false">完成选择</button></div>
                 </div>
               </div>
               <div v-if="cityValues.length" class="selected-cities"><span v-for="city in cityValues" :key="city">{{ city }}<button type="button" @click="toggleCity(city)">×</button></span></div>
@@ -114,7 +114,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { CITY_GROUPS, INTENTION_OPTIONS, requestJobRecommendations } from '@/lib/jobRecommendation.mjs'
 import { readJson } from '@/lib/api'
@@ -141,6 +141,8 @@ const intentionValues = ref([])
 const cityValues = ref([])
 const cityDropdownOpen = ref(false)
 const citySearch = ref('')
+const aiBody = ref(null)
+const cityMenuFoot = ref(null)
 const recommendations = ref([])
 const recommendLoading = ref(false)
 const recommendError = ref('')
@@ -354,6 +356,18 @@ watch(() => route.fullPath, () => {
   resumeAdvice.value = null
   resumeAdviceError.value = ''
   resumeFileError.value = ''
+})
+
+watch(cityDropdownOpen, async readOpen => {
+  if (!readOpen) return
+  await nextTick()
+  const readBody = aiBody.value
+  const readFoot = cityMenuFoot.value
+  if (!readBody || !readFoot) return
+  const readBodyRect = readBody.getBoundingClientRect()
+  const readFootRect = readFoot.getBoundingClientRect()
+  const readOverflow = readFootRect.bottom - readBodyRect.bottom + 12
+  if (readOverflow > 0) readBody.scrollTop += readOverflow
 })
 </script>
 
