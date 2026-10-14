@@ -164,7 +164,7 @@
                 <div style="flex:1;min-width:0">
                   <div style="display:flex;align-items:center;gap:.45rem">
                     <span style="font-size:.867rem;font-weight:600;color:var(--ink)">{{ a.title }}</span>
-                    <span v-if="isExpired(a.deadline)" style="font-size:.67rem;font-weight:600;color:#999;background:#f0f0f0;border-radius:999px;padding:.1rem .45rem;">已截止</span>
+                    <span v-if="isExpired(a.deadline)" style="font-size:.67rem;font-weight:600;color:#999;background:#f0f0f0;border-radius:999px;padding:.1rem .45rem;">投递已结束</span>
                   </div>
                   <div style="font-size:.773rem;color:var(--ink-2)">{{ a.company }}</div>
                 </div>

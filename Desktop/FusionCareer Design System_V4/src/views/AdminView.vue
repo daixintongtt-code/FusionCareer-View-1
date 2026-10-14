@@ -138,7 +138,7 @@
           <div style="display:flex;align-items:center;gap:.625rem;margin-bottom:1.1rem;flex-wrap:wrap">
             <input class="form-control" style="flex:1;min-width:180px;padding:.5rem .875rem" v-model="sk" placeholder="搜索岗位名称、公司..." @keyup.enter="searchAdminJobs" />
             <select class="form-control" style="min-width:110px;padding:.5rem .875rem" v-model="sf">
-              <option value="">全部状态</option><option value="PUBLISHED">发布中</option><option value="RECOMMENDED">推荐中</option><option value="OFFLINE">未发布</option><option value="EXPIRED">已截止</option>
+              <option value="">全部状态</option><option value="PUBLISHED">发布中</option><option value="RECOMMENDED">推荐中</option><option value="OFFLINE">未发布</option><option value="EXPIRED">投递已结束</option>
             </select>
             <button class="btn btn-secondary btn-sm" @click="searchAdminJobs"><i class="ti ti-search" />搜索</button>
           </div>
@@ -159,7 +159,7 @@
               <thead>
                 <tr>
                   <th class="col-check"><input type="checkbox" :checked="filteredJobs.length>0 && filteredJobs.every(j=>selected.includes(j.id))" @change="e=>toggleAll(e.target.checked)" /></th>
-                  <th>岗位名称</th><th>公司</th><th>城市</th><th>投递截止</th><th>状态</th><th>投递数</th><th>推荐</th><th>操作</th>
+                  <th>岗位名称</th><th>公司</th><th>城市</th><th>投递期限</th><th>状态</th><th>投递数</th><th>推荐</th><th>操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -325,7 +325,7 @@
               <div class="form-group"><label class="form-label">招聘人数</label>
                 <input class="form-control" type="number" min="1" v-model.number="nj.headcount" placeholder="若干" />
               </div>
-              <div class="form-group"><label class="form-label">投递截止日期</label>
+              <div class="form-group"><label class="form-label">投递期限</label>
                 <input class="form-control" type="date" v-model="nj.applicationDeadline" />
               </div>
               <div class="form-group"><label class="form-label">岗位大类 <span class="req">*</span></label>
@@ -613,7 +613,7 @@
                 <thead>
                   <tr>
                     <th class="col-check"><input type="checkbox" :checked="draftJobs.length>0 && draftJobs.every(j=>draftSelected.includes(j.id))" @change="e=>draftToggleAll(e.target.checked)" /></th>
-                    <th>岗位名称</th><th>公司</th><th>岗位大类</th><th>岗位小类</th><th>投递截止</th><th>来源</th><th>操作</th>
+                    <th>岗位名称</th><th>公司</th><th>岗位大类</th><th>岗位小类</th><th>投递期限</th><th>来源</th><th>操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -667,7 +667,7 @@
           <template v-else>
             <div class="card" style="overflow:auto">
               <table class="data-table">
-                <thead><tr><th>岗位名称</th><th>公司</th><th>投递截止</th><th>回收原因</th><th>回收时间</th><th>操作</th></tr></thead>
+                <thead><tr><th>岗位名称</th><th>公司</th><th>投递期限</th><th>回收原因</th><th>回收时间</th><th>操作</th></tr></thead>
                 <tbody>
                   <tr v-for="readJob in recycleJobs" :key="readJob.id">
                     <td>{{ readJob.positionName }}</td>
@@ -718,7 +718,7 @@
               </div>
               <div class="jrc-row-meta">
                 <span :class="['badge', STATUS_CLASS[jg.status] || 'badge-gray']" style="font-size:.7rem">{{ STATUS_LABEL[jg.status] || jg.status }}</span>
-                <span style="font-size:.75rem;color:var(--ink-3)">截止 {{ jg.dl }}</span>
+                <span style="font-size:.75rem;color:var(--ink-3)">截至 {{ jg.dl }}</span>
               </div>
               <div class="jrc-row-count">
                 <span class="jrc-count-num">{{ jg.applicationCount }}</span>
@@ -1287,7 +1287,7 @@ const recycleTotal = ref(0)
 const recycleLoading = ref(false)
 const recycleError = ref('')
 const restoringJobId = ref(null)
-const STATUS_LABEL = { PUBLISHED:'发布中', OFFLINE:'未发布', EXPIRED:'已截止' }
+const STATUS_LABEL = { PUBLISHED:'发布中', OFFLINE:'未发布', EXPIRED:'投递已结束' }
 const STATUS_CLASS = { PUBLISHED:'badge-green', OFFLINE:'badge-gray', EXPIRED:'badge-amber' }
 const STATUS_ORDER = { PUBLISHED:0, OFFLINE:1, EXPIRED:2 }
 const JOB_CATEGORY_LABEL = {
@@ -1502,7 +1502,7 @@ async function bulkPublish() {
   const updateJobs = jobs.value.filter(readJob => selected.value.includes(readJob.id)
     && readJob.status === 'OFFLINE')
   await Promise.all(updateJobs.map(updateJob => updateJobPost(updateJob, { status:'PUBLISHED' })))
-  toast.success(skipped > 0 ? `已发布 ${n} 条，跳过 ${skipped} 条（已发布或已截止）` : `已发布 ${n} 条`)
+  toast.success(skipped > 0 ? `已发布 ${n} 条，跳过 ${skipped} 条（已发布或投递已结束）` : `已发布 ${n} 条`)
   selected.value = []
 }
 async function bulkRec(updateRecommended) {
@@ -1521,7 +1521,7 @@ async function bulkOffline() {
     && readJob.status === 'PUBLISHED')
   await Promise.all(updateJobs.map(updateJob => updateJobPost(updateJob, { status:'OFFLINE' })))
   if (sf.value === 'RECOMMENDED') await loadJobs()
-  toast.success(skipped > 0 ? `已停止发布 ${n} 条，跳过 ${skipped} 条（未发布或已截止）` : `已停止发布 ${n} 条`)
+  toast.success(skipped > 0 ? `已停止发布 ${n} 条，跳过 ${skipped} 条（未发布或投递已结束）` : `已停止发布 ${n} 条`)
   selected.value = []
 }
 function bulkDelete(ids) {
