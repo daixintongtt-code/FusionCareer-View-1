@@ -94,9 +94,9 @@
           <div class="sort-area">
             <div class="sort-toggle" aria-label="岗位排序">
               <button :class="['sort-btn', filters.sort==='newest' && 'active']" :aria-pressed="filters.sort==='newest'" @click="setSort('newest')">最新发布</button>
-              <button :class="['sort-btn', filters.sort==='deadline' && 'active']" :aria-pressed="filters.sort==='deadline'" @click="setSort('deadline')">即将截止</button>
+              <button :class="['sort-btn', filters.sort==='deadline' && 'active']" :aria-pressed="filters.sort==='deadline'" @click="setSort('deadline')">即将到期</button>
             </div>
-            <span class="sort-hint">{{ filters.sort==='deadline' ? '截止日期从近到远' : '发布时间从新到旧' }}</span>
+            <span class="sort-hint">{{ filters.sort==='deadline' ? '投递期限从近到远' : '发布时间从新到旧' }}</span>
           </div>
         </div>
         <div v-if="loading" class="list-message">加载中…</div>
@@ -116,7 +116,7 @@
               </div>
             </RouterLink>
             <div class="job-actions">
-              <time v-if="job.deadline" class="job-dl" :datetime="job.deadline">截止 {{ job.dl }}</time>
+              <time v-if="job.deadline" class="job-dl" :datetime="job.deadline">截至 {{ job.dl }}</time>
               <button type="button" :class="['job-favorite-btn', favoriteIds.includes(String(job.id)) && 'active']" :aria-pressed="favoriteIds.includes(String(job.id))" :aria-label="(favoriteIds.includes(String(job.id)) ? '取消收藏：' : '收藏岗位：')+job.title" :disabled="!favoritesReady" @click="toggleJobFavorite(job)"><i :class="['ti', favoriteIds.includes(String(job.id)) ? 'ti-heart-filled' : 'ti-heart']" aria-hidden="true" /><span>{{ favoriteIds.includes(String(job.id)) ? '已收藏' : '收藏' }}</span></button>
             </div>
           </article>

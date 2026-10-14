@@ -38,7 +38,7 @@
               <div v-if="jobCities" class="info-item"><i class="ti ti-map-pin"></i>{{ jobCities }}</div>
               <div v-if="job.salaryDisplay" class="info-item"><i class="ti ti-coin"></i>{{ job.salaryDisplay }}</div>
               <div v-if="job.workMode" class="info-item"><i class="ti ti-building"></i>{{ workModeLabel }}</div>
-              <div v-if="job.applicationDeadline" class="info-item"><i class="ti ti-calendar-due"></i>投递截止 {{ job.applicationDeadline.slice(0,10) }}</div>
+              <div v-if="job.applicationDeadline" class="info-item"><i class="ti ti-calendar-due"></i>投递截至 {{ job.applicationDeadline.slice(0,10) }}</div>
               <div v-if="job.workStartDate || job.workEndDate" class="info-item"><i class="ti ti-calendar"></i>工作时间 {{ [job.workStartDate, job.workEndDate].filter(Boolean).map(value => value.slice(0,10)).join(' 至 ') }}</div>
               <div v-if="job.recruitType" class="info-item"><i class="ti ti-users"></i>{{ recruitLabel }}</div>
             </div>
@@ -68,7 +68,7 @@
             </div>
             <div style="font-size:.773rem;color:var(--ink-2);margin-bottom:1rem;display:flex;align-items:center;gap:.4rem">
               <i class="ti ti-calendar-due" style="color:var(--ink-3)"></i>
-              投递截止：{{ job.applicationDeadline ? job.applicationDeadline.slice(0,10) : '未设置' }}
+              投递期限：{{ job.applicationDeadline ? job.applicationDeadline.slice(0,10) : '未设置' }}
             </div>
             <!-- 外部投递 -->
             <template v-if="job.sourceUrl">
@@ -303,7 +303,7 @@ async function loadMyAnswer() {
 
 async function openApply() {
   if (questionnaireExpired.value) {
-    toast.error('问卷已截止，无法投递或修改')
+    toast.error('投递已结束，无法投递或修改')
     return
   }
   answers.value = {}
