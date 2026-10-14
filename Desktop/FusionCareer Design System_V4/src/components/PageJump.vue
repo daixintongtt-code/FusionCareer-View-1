@@ -32,13 +32,13 @@ function submit() {
 </script>
 
 <style scoped>
-.page-jump { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; font-size:16px; color:var(--ink-2); }
+.page-jump { display:flex; align-items:center; flex-wrap:wrap; gap:.4rem; font-size:13px; color:var(--ink-2); }
 .page-jump label { display:flex; align-items:center; gap:.35rem; }
 .page-jump input {
-  width: 4.5rem; min-height:38px; padding: .35rem; border: 1px solid var(--border-mid);
+  width: 3.6rem; min-height:32px; padding: .3rem; border: 1px solid var(--border-mid);
   border-radius: var(--r-sm); text-align: center; color: var(--ink);
-  background: var(--bg-card); font-size:16px;
+  background: var(--bg-card); font-size:13px;
 }
 .page-jump input:focus-visible { outline:2px solid var(--red); outline-offset:2px; }
-.page-jump-error { flex-basis:100%; color:var(--red); font-size:14px; }
+.page-jump-error { flex-basis:100%; color:var(--red); font-size:12px; }
 </style>

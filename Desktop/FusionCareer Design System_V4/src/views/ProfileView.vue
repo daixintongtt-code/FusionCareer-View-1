@@ -862,18 +862,18 @@ function cancelDeleteResume() {
 .favorites-panel-title { justify-content:space-between; }
 .favorites-panel-title>span { display:flex; align-items:center; gap:.65rem; }
 .favorites-panel-title small { color:var(--ink-3); font-size:.78rem; font-weight:500; }
-.profile-favorites-note { margin:-.6rem 0 1.2rem; color:var(--ink-2); font-size:15px; line-height:1.6; }
+.profile-favorites-note { margin:-.6rem 0 1rem; color:var(--ink-2); font-size:12px; line-height:1.6; }
 .profile-favorites-error { color:var(--red); font-size:16px; line-height:1.6; }
 .profile-account-error { color:var(--red); font-size:16px; line-height:1.6; }
 .profile-account-error p { margin-bottom:1rem; }
 .profile-favorites { display:flex; flex-direction:column; gap:.8rem; }
-.profile-favorite-row { display:flex; align-items:center; gap:1rem; padding:1rem 1.1rem; border:1px solid var(--border); border-radius:18px; background:var(--bg-card); transition:all var(--t); }
+.profile-favorite-row { display:flex; align-items:center; gap:.85rem; padding:.8rem 1rem; border:1px solid var(--border); border-radius:14px; background:var(--bg-card); transition:all var(--t); }
 .profile-favorite-row:hover { border-color:var(--red-border); box-shadow:0 8px 22px rgba(0,0,0,.045); transform:translateY(-1px); }
 .profile-favorite-main { flex:1; min-width:0; cursor:pointer; text-decoration:none; overflow-wrap:anywhere; }
-.profile-favorite-main strong { display:block; color:var(--ink); font-size:18px; line-height:1.4; }
-.profile-favorite-main>span { display:block; margin-top:.25rem; color:var(--ink); font-size:17px; font-weight:650; }
+.profile-favorite-main strong { display:block; color:var(--ink); font-size:15px; line-height:1.4; }
+.profile-favorite-main>span { display:block; margin-top:.2rem; color:var(--ink); font-size:14px; font-weight:600; }
 .profile-favorite-main>div { display:flex; flex-wrap:wrap; gap:.6rem; margin-top:.35rem; }
-.profile-favorite-main em { display:inline-flex; align-items:center; gap:.25rem; color:var(--ink-2); font-size:15px; font-style:normal; }
+.profile-favorite-main em { display:inline-flex; align-items:center; gap:.25rem; color:var(--ink-2); font-size:12px; font-style:normal; }
 .profile-favorite-remove { width:44px; height:44px; display:grid; place-items:center; flex-shrink:0; border:1px solid var(--red-border); border-radius:50%; color:var(--red); background:var(--red-light); cursor:pointer; }
 .profile-favorite-main:focus-visible,.profile-favorite-remove:focus-visible { outline:3px solid var(--red); outline-offset:3px; border-radius:8px; }
 .profile-favorite-row>.btn { text-decoration:none; }
