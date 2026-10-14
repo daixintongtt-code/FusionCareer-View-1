@@ -94,9 +94,9 @@
           <div class="sort-area">
             <div class="sort-toggle" aria-label="岗位排序">
               <button :class="['sort-btn', filters.sort==='newest' && 'active']" :aria-pressed="filters.sort==='newest'" @click="setSort('newest')">最新发布</button>
-              <button :class="['sort-btn', filters.sort==='deadline' && 'active']" :aria-pressed="filters.sort==='deadline'" @click="setSort('deadline')">即将到期</button>
+              <button :class="['sort-btn', filters.sort==='deadline' && 'active']" :aria-pressed="filters.sort==='deadline'" @click="setSort('deadline')">结束时间</button>
             </div>
-            <span class="sort-hint">{{ filters.sort==='deadline' ? '投递期限从近到远' : '发布时间从新到旧' }}</span>
+            <span class="sort-hint">{{ filters.sort==='deadline' ? '投递结束时间从早到晚' : '发布时间从新到旧' }}</span>
           </div>
         </div>
         <div v-if="loading" class="list-message">加载中…</div>
