@@ -49,7 +49,8 @@ export async function requestApi(readPath, readOptions = {}) {
     readBody = { code: readResponse.status, message: readText || readResponse.statusText, data: null }
   }
   if (readResponse.status === 401 || readBody?.code === 401) {
-    deleteToken()
+    // A late response from an older session must not sign out the new account.
+    if (readToken()===readValue) deleteToken()
     const createError = new Error(readBody?.message || '未登录或登录已过期')
     createError.code = 401
     throw createError
@@ -74,7 +75,7 @@ export async function downloadFile(readPath) {
   if (readValue) updateHeaders.set('Fusion-Token', readValue)
   const readResponse = await fetch(buildUrl(readPath), { method: 'GET', headers: updateHeaders })
   if (readResponse.status === 401) {
-    deleteToken()
+    if (readToken()===readValue) deleteToken()
     throw new Error('未登录或登录已过期')
   }
   if (!readResponse.ok) throw new Error(`下载失败 (${readResponse.status})`)

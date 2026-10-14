@@ -22,6 +22,12 @@
 
         <!-- 右侧面板 -->
         <div>
+          <p v-if="accountLoading" role="status">正在加载个人中心…</p>
+          <div v-else-if="accountLoadError" class="card card-p profile-account-error" role="status">
+            <p>{{ accountLoadError }}</p>
+            <button class="btn btn-secondary" type="button" @click="loadAccountData">重新加载个人中心</button>
+          </div>
+          <template v-if="!accountLoading && !accountLoadError">
 
           <!-- 我的资料 -->
           <template v-if="view==='info'">
@@ -178,21 +184,30 @@
             <div class="card card-p">
               <div class="panel-title favorites-panel-title">
                 <span><i class="ti ti-heart" />我的收藏</span>
-                <small>{{ favorites.length }} 个岗位</small>
+                <small v-if="!favoritesLoading">{{ favorites.length }} 个岗位</small>
               </div>
-              <div v-if="favorites.length" class="profile-favorites">
+              <p class="profile-favorites-note">收藏保存在当前浏览器，仅当前账号可见；更换设备或浏览器后不会同步。</p>
+              <p v-if="favoritesLoading" role="status">正在加载收藏…</p>
+              <div v-else-if="favoritesError" class="profile-favorites-error" role="status">
+                <p>{{ favoritesError }}</p>
+                <button class="btn btn-secondary" type="button" @click="loadAccountData">重新加载</button>
+              </div>
+              <div v-else-if="favorites.length" class="profile-favorites">
                 <article v-for="favoriteJob in favorites" :key="favoriteJob.id" class="profile-favorite-row">
                   <JobCategoryIcon :category="favoriteJob.jobCategory || favoriteJob.category" :size="44" />
-                  <div class="profile-favorite-main" @click="router.push(`/job/${favoriteJob.id}`)">
+                  <RouterLink class="profile-favorite-main" :to="`/job/${encodeURIComponent(favoriteJob.id)}`">
                     <strong>{{ favoriteJob.positionName || favoriteJob.title }}</strong>
                     <span>{{ favoriteJob.companyName || favoriteJob.company }}</span>
                     <div>
                       <em v-if="favoriteJob.workCity || favoriteJob.city"><i class="ti ti-map-pin" />{{ favoriteJob.workCity || favoriteJob.city }}</em>
                       <em v-if="favoriteJob.salaryDisplay"><i class="ti ti-coin" />{{ favoriteJob.salaryDisplay }}</em>
                     </div>
-                  </div>
-                  <button class="profile-favorite-remove" type="button" title="取消收藏" @click="removeSavedJob(favoriteJob.id)"><i class="ti ti-heart-filled" /></button>
-                  <button class="btn btn-secondary btn-sm" type="button" @click="router.push(`/job/${favoriteJob.id}`)">查看岗位</button>
+                  </RouterLink>
+                  <button class="profile-favorite-remove" type="button" title="取消收藏"
+                    :aria-label="`取消收藏${favoriteJob.positionName || favoriteJob.title}`"
+                    @click="removeSavedJob(favoriteJob.id)"><i class="ti ti-heart-filled" aria-hidden="true" /></button>
+                  <RouterLink class="btn btn-secondary btn-sm" :to="`/job/${encodeURIComponent(favoriteJob.id)}`"
+                    :aria-label="`查看${favoriteJob.positionName || favoriteJob.title}岗位详情`">查看岗位</RouterLink>
                 </article>
               </div>
               <div v-else class="profile-favorites-empty">
@@ -203,7 +218,7 @@
               </div>
             </div>
           </template>
-
+          </template>
         </div>
       </div>
     </div>
@@ -295,8 +310,8 @@ import JobCategoryIcon from '@/components/JobCategoryIcon.vue'
 import MultiLevelTagPicker from '@/components/MultiLevelTagPicker.vue'
 import { useToast } from '@/composables/useToast'
 import { logoutUser, readUser } from '@/lib/auth'
-import { downloadFile as downloadBlob, readJson, uploadForm } from '@/lib/api'
-import { readFavorites, removeFavorite, subscribeFavorites } from '@/lib/favorites'
+import { downloadFile as downloadBlob, readJson, readToken, uploadForm } from '@/lib/api'
+import { readFavorites, removeFavorite, setFavoritesUser, subscribeFavorites } from '@/lib/favorites'
 import {
   CITY_INTENTION_OPTIONS,
   JOB_INTENTION_OPTIONS,
@@ -334,16 +349,15 @@ const view = ref(validViews.includes(route.query.tab) ? route.query.tab : 'info'
 watch(() => route.query.tab, (t) => {
   view.value = validViews.includes(t) ? t : 'info'
 })
-onMounted(() => {
-  favorites.value = readFavorites()
+onMounted(async () => {
   unsubscribeFavorites = subscribeFavorites(items => { favorites.value = items })
-  loadProfile()
-  loadResume()
-  loadFiles()
-  loadQuota()
-  loadApplications()
+  await loadAccountData()
 })
-onBeforeUnmount(() => unsubscribeFavorites?.())
+onBeforeUnmount(() => {
+  favoritesDisposed = true
+  favoritesSequence += 1
+  unsubscribeFavorites?.()
+})
 
 function switchView(nextView) {
   if (!validViews.includes(nextView)) return
@@ -362,10 +376,70 @@ const navItems = [
 ]
 
 const favorites = ref([])
+const favoritesLoading = ref(true)
+const favoritesError = ref('')
+const accountLoading = ref(true)
+const accountLoadError = ref('')
 let unsubscribeFavorites = null
+let favoritesDisposed = false
+let favoritesSequence = 0
+async function initializeFavorites() {
+  if (favoritesDisposed) return false
+  const sequence = ++favoritesSequence
+  const token = readToken()
+  const isCurrent = () => !favoritesDisposed && sequence === favoritesSequence
+  favoritesLoading.value = true
+  favoritesError.value = ''
+  setFavoritesUser(null)
+  try {
+    const user = await readUser(true)
+    if (!isCurrent()) return false
+    if (readToken() !== token) {
+      favoritesError.value = '登录状态已变化，请重新登录后重试'
+      return false
+    }
+    setFavoritesUser(user)
+    if (!user) throw new Error('请登录后查看收藏岗位')
+    favorites.value = readFavorites()
+    return true
+  } catch (error) {
+    if (!isCurrent()) return false
+    favorites.value = []
+    favoritesError.value = readToken() !== token
+      ? '登录状态已变化，请重新登录后重试'
+      : error?.message || '无法加载收藏，请重试'
+    return false
+  } finally {
+    if (isCurrent()) favoritesLoading.value = false
+  }
+}
+async function loadAccountData() {
+  if (favoritesDisposed) return
+  const token = readToken()
+  accountLoading.value = true
+  accountLoadError.value = ''
+  const initialization = initializeFavorites()
+  const sequence = favoritesSequence
+  const isCurrent = () => !favoritesDisposed && sequence === favoritesSequence
+  try {
+    const initialized = await initialization
+    if (!isCurrent()) return
+    if (!initialized || readToken() !== token) {
+      accountLoadError.value = favoritesError.value || '登录状态已变化，请重新登录后重试'
+      return
+    }
+    await Promise.all([loadProfile(), loadResume(), loadFiles(), loadQuota(), loadApplications()])
+  } finally {
+    if (isCurrent()) accountLoading.value = false
+  }
+}
 function removeSavedJob(readJobId) {
-  removeFavorite(readJobId)
-  toast.success('已取消收藏')
+  try {
+    removeFavorite(readJobId)
+    toast.success('已取消收藏')
+  } catch (error) {
+    toast.error(error?.message || '取消收藏失败，请重试')
+  }
 }
 
 // ── 个人资料（对齐后端字段名）──
@@ -788,15 +862,21 @@ function cancelDeleteResume() {
 .favorites-panel-title { justify-content:space-between; }
 .favorites-panel-title>span { display:flex; align-items:center; gap:.65rem; }
 .favorites-panel-title small { color:var(--ink-3); font-size:.78rem; font-weight:500; }
+.profile-favorites-note { margin:-.6rem 0 1.2rem; color:var(--ink-2); font-size:15px; line-height:1.6; }
+.profile-favorites-error { color:var(--red); font-size:16px; line-height:1.6; }
+.profile-account-error { color:var(--red); font-size:16px; line-height:1.6; }
+.profile-account-error p { margin-bottom:1rem; }
 .profile-favorites { display:flex; flex-direction:column; gap:.8rem; }
 .profile-favorite-row { display:flex; align-items:center; gap:1rem; padding:1rem 1.1rem; border:1px solid var(--border); border-radius:18px; background:var(--bg-card); transition:all var(--t); }
 .profile-favorite-row:hover { border-color:var(--red-border); box-shadow:0 8px 22px rgba(0,0,0,.045); transform:translateY(-1px); }
-.profile-favorite-main { flex:1; min-width:0; cursor:pointer; }
-.profile-favorite-main strong { display:block; color:var(--ink); font-size:.9rem; line-height:1.4; }
-.profile-favorite-main>span { display:block; margin-top:.16rem; color:var(--ink-2); font-size:.78rem; }
+.profile-favorite-main { flex:1; min-width:0; cursor:pointer; text-decoration:none; overflow-wrap:anywhere; }
+.profile-favorite-main strong { display:block; color:var(--ink); font-size:18px; line-height:1.4; }
+.profile-favorite-main>span { display:block; margin-top:.25rem; color:var(--ink); font-size:17px; font-weight:650; }
 .profile-favorite-main>div { display:flex; flex-wrap:wrap; gap:.6rem; margin-top:.35rem; }
-.profile-favorite-main em { display:inline-flex; align-items:center; gap:.25rem; color:var(--ink-3); font-size:.7rem; font-style:normal; }
-.profile-favorite-remove { width:38px; height:38px; display:grid; place-items:center; flex-shrink:0; border:1px solid var(--red-border); border-radius:50%; color:var(--red); background:var(--red-light); cursor:pointer; }
+.profile-favorite-main em { display:inline-flex; align-items:center; gap:.25rem; color:var(--ink-2); font-size:15px; font-style:normal; }
+.profile-favorite-remove { width:44px; height:44px; display:grid; place-items:center; flex-shrink:0; border:1px solid var(--red-border); border-radius:50%; color:var(--red); background:var(--red-light); cursor:pointer; }
+.profile-favorite-main:focus-visible,.profile-favorite-remove:focus-visible { outline:3px solid var(--red); outline-offset:3px; border-radius:8px; }
+.profile-favorite-row>.btn { text-decoration:none; }
 .profile-favorites-empty { display:flex; flex-direction:column; align-items:center; padding:3rem 1rem; text-align:center; }
 .profile-favorites-empty>div { width:62px; height:62px; display:grid; place-items:center; border-radius:50%; color:var(--red); background:var(--red-light); font-size:1.6rem; }
 .profile-favorites-empty strong { margin-top:.9rem; color:var(--ink); font-size:1rem; }

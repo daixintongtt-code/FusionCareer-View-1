@@ -1,6 +1,7 @@
 import { deleteToken, readJson, readToken, saveToken } from '@/lib/api'
 
 let readUserCache = null
+let readUserToken = ''
 
 function createDevUser(readRole) {
   const readIsAdmin = readRole === 'ADMIN'
@@ -39,14 +40,18 @@ export function consumeToken() {
 
 export async function readUser(readRefresh = false) {
   const readValue = readToken()
-  if (!readValue) return null
+  if (!readValue) { readUserCache=null; readUserToken=''; return null }
   if (import.meta.env.DEV && readValue.startsWith('local-demo-')) {
     const readRole = readValue.slice('local-demo-'.length) === 'ADMIN' ? 'ADMIN' : 'NORMAL'
     readUserCache = createDevUser(readRole)
+    readUserToken = readValue
     return readUserCache
   }
-  if (!readRefresh && readUserCache) return readUserCache
-  readUserCache = await readJson('/user/me')
+  if (!readRefresh && readUserCache && readUserToken===readValue) return readUserCache
+  const user = await readJson('/user/me')
+  if (readToken()!==readValue) throw new Error('登录身份已变化，请重新加载')
+  readUserCache = user
+  readUserToken = readValue
   return readUserCache
 }
 
@@ -55,6 +60,7 @@ export function loginUser(readRole) {
     const readDevRole = readRole === 'ADMIN' ? 'ADMIN' : 'NORMAL'
     saveToken(`local-demo-${readDevRole}`)
     readUserCache = createDevUser(readDevRole)
+    readUserToken = readToken()
     window.location.hash = readDevRole === 'ADMIN' ? '#/admin' : '#/home'
     return
   }
@@ -69,6 +75,7 @@ export async function logoutUser() {
     readUrl = readResult?.redirectUrl || ''
   } finally {
     readUserCache = null
+    readUserToken = ''
     deleteToken()
   }
   if (readUrl) window.location.assign(readUrl)

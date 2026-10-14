@@ -15,17 +15,21 @@
         <div>
           <!-- 公司头部 -->
           <div class="card card-p" style="margin-bottom:1rem">
-            <div style="display:flex;align-items:center;gap:1rem">
+            <div class="detail-heading">
               <JobCategoryIcon :category="job.jobCategory" :size="52" />
-              <div>
-                <div style="font-size:1.15rem;font-weight:700;color:var(--ink);margin-bottom:.2rem">{{ job.positionName }}</div>
-                <div style="font-size:.867rem;color:var(--ink-2)">{{ job.companyName }}</div>
+              <div class="detail-heading-copy">
+                <h1 class="detail-position">{{ job.positionName }}</h1>
+                <div class="detail-company">{{ job.companyName }}</div>
               </div>
-              <button :class="['detail-favorite', favorite && 'active']" type="button" @click="toggleCurrentFavorite">
-                <i :class="['ti', favorite ? 'ti-heart-filled' : 'ti-heart']" />
+              <button :class="['detail-favorite', favorite && 'active']" type="button"
+                :aria-label="`${favorite ? '取消收藏' : '收藏'}${job.positionName}`"
+                :aria-pressed="favorite" :disabled="!favoritesReady" @click="toggleCurrentFavorite">
+                <i :class="['ti', favorite ? 'ti-heart-filled' : 'ti-heart']" aria-hidden="true" />
                 {{ favorite ? '已收藏' : '收藏岗位' }}
               </button>
             </div>
+            <p class="detail-favorite-note">收藏保存在当前浏览器，仅当前账号可见。</p>
+            <p v-if="favoritesError" class="detail-favorite-error" role="status">{{ favoritesError }}</p>
           </div>
           <!-- 基本信息 -->
           <div class="card card-p">
@@ -41,16 +45,16 @@
             <div class="divider"></div>
             <div v-if="job.jobDesc">
               <div class="ds-title"><i class="ti ti-file-description"></i>岗位描述</div>
-              <p style="font-size:.833rem;color:var(--ink-2);line-height:1.8;white-space:pre-wrap">{{ job.jobDesc }}</p>
+              <p class="detail-description">{{ job.jobDesc }}</p>
               <div class="divider"></div>
             </div>
             <div v-if="eduLabel || job.reqMajor || job.reqSkills || job.reqOther">
               <div class="ds-title"><i class="ti ti-checklist"></i>岗位要求</div>
-              <ul style="padding-left:1.25rem">
-                <li v-if="eduLabel" style="font-size:.833rem;color:var(--ink-2);line-height:1.9;list-style:disc">学历要求：{{ eduLabel }}</li>
-                <li v-if="job.reqMajor"    style="font-size:.833rem;color:var(--ink-2);line-height:1.9;list-style:disc">专业要求：{{ job.reqMajor }}</li>
-                <li v-if="job.reqSkills"   style="font-size:.833rem;color:var(--ink-2);line-height:1.9;list-style:disc">技能要求：{{ job.reqSkills }}</li>
-                <li v-if="job.reqOther"    style="font-size:.833rem;color:var(--ink-2);line-height:1.9;list-style:disc">其他要求：{{ job.reqOther }}</li>
+              <ul class="detail-requirements">
+                <li v-if="eduLabel">学历要求：{{ eduLabel }}</li>
+                <li v-if="job.reqMajor">专业要求：{{ job.reqMajor }}</li>
+                <li v-if="job.reqSkills">技能要求：{{ job.reqSkills }}</li>
+                <li v-if="job.reqOther">其他要求：{{ job.reqOther }}</li>
               </ul>
             </div>
           </div>
@@ -168,8 +172,9 @@ import AppToast from '@/components/AppToast.vue'
 import JobCategoryIcon from '@/components/JobCategoryIcon.vue'
 import { useToast } from '@/composables/useToast'
 import { formatCities, formatEducation } from '@/lib/jobRequirements.mjs'
-import { readJson } from '@/lib/api'
-import { isFavorite, subscribeFavorites, toggleFavorite } from '@/lib/favorites'
+import { readJson, readToken } from '@/lib/api'
+import { readUser } from '@/lib/auth'
+import { isFavorite, setFavoritesUser, subscribeFavorites, toggleFavorite } from '@/lib/favorites'
 import {
   applyParsedToDetailForm,
   loadMyAnswerRecord,
@@ -195,12 +200,48 @@ const fileAnswers = ref({})
 const fileRefs = {}
 const questionnaireExpired = ref(false)
 const favorite = ref(false)
+const favoritesReady = ref(false)
+const favoritesError = ref('')
 let unsubscribeFavorites = null
+let favoritesDisposed = false
+let favoritesSequence = 0
 
 function toggleCurrentFavorite() {
-  if (!job.value) return
-  favorite.value = toggleFavorite(job.value)
-  toast.success(favorite.value ? '已加入收藏夹' : '已取消收藏')
+  if (!job.value || !favoritesReady.value) return
+  try {
+    favorite.value = toggleFavorite(job.value)
+    favoritesError.value = ''
+    toast.success(favorite.value ? '已加入收藏夹（当前浏览器）' : '已取消收藏')
+  } catch (error) {
+    toast.error(error?.message || '收藏失败，请重试')
+  }
+}
+
+async function initializeFavorites() {
+  if (favoritesDisposed) return
+  const sequence = ++favoritesSequence
+  const token = readToken()
+  const isCurrent = () => !favoritesDisposed && sequence === favoritesSequence
+  favoritesReady.value = false
+  favoritesError.value = ''
+  setFavoritesUser(null)
+  try {
+    const user = await readUser(true)
+    if (!isCurrent()) return
+    if (readToken() !== token) {
+      favoritesError.value = '登录状态已变化，请重新登录后重试'
+      return
+    }
+    setFavoritesUser(user)
+    favoritesReady.value = !!user
+    if (!user) favoritesError.value = '请登录后收藏岗位'
+    favorite.value = isFavorite(route.params.id)
+  } catch (error) {
+    if (!isCurrent()) return
+    favoritesError.value = readToken() !== token
+      ? '登录状态已变化，请重新登录后重试'
+      : error?.message || '无法加载收藏，请刷新页面重试'
+  }
 }
 
 // 从接口加载当前用户的简历文件列表
@@ -318,12 +359,16 @@ async function submitApply() {
 }
 
 onMounted(() => {
-  favorite.value = isFavorite(route.params.id)
   unsubscribeFavorites = subscribeFavorites(() => { favorite.value = isFavorite(route.params.id) })
+  initializeFavorites()
   loadJob()
   loadMyResumes()
 })
-onBeforeUnmount(() => unsubscribeFavorites?.())
+onBeforeUnmount(() => {
+  favoritesDisposed = true
+  favoritesSequence += 1
+  unsubscribeFavorites?.()
+})
 
 // loadJob 内部加载完岗位后再加载题目
 async function loadJob() {
@@ -344,13 +389,24 @@ async function loadJob() {
 .detail-layout { display:grid; grid-template-columns:minmax(0, 1fr) 295px; gap:1.5rem; align-items:start; }
 .detail-layout > div { min-width: 0; }
 .detail-layout .card { overflow-wrap: anywhere; }
+.detail-heading { display:flex; align-items:center; gap:1rem; flex-wrap:wrap; }
+.detail-heading-copy { flex:1; min-width:0; }
+.detail-position { margin:0 0 .35rem; font-size:26px; font-weight:750; color:var(--ink); line-height:1.35; }
+.detail-company { font-size:20px; font-weight:700; color:var(--ink); line-height:1.5; }
+.detail-description { font-size:18px; color:var(--ink-2); line-height:1.85; white-space:pre-wrap; }
+.detail-requirements { padding-left:1.25rem; font-size:18px; color:var(--ink-2); line-height:1.85; }
+.detail-requirements li { list-style:disc; white-space:pre-wrap; }
+.detail-favorite-note { margin:.8rem 0 0; font-size:14px; line-height:1.6; color:var(--ink-3); }
+.detail-favorite-error { margin:.35rem 0 0; font-size:14px; line-height:1.6; color:var(--red); }
 .apply-sidebar { position:sticky; top:calc(var(--nav-h) + 1rem); }
-.detail-favorite { margin-left:auto; display:inline-flex; align-items:center; gap:.35rem; padding:.45rem .7rem; border:1px solid var(--border); border-radius:999px; color:var(--ink-2); background:var(--bg-card); font-size:.75rem; cursor:pointer; transition:all var(--t); }
+.detail-favorite { margin-left:auto; min-height:44px; display:inline-flex; align-items:center; gap:.35rem; padding:.45rem .8rem; border:1px solid var(--border); border-radius:999px; color:var(--ink-2); background:var(--bg-card); font-size:16px; cursor:pointer; transition:all var(--t); }
 .detail-favorite:hover,.detail-favorite.active { color:var(--red); border-color:var(--red-border); background:var(--red-light); }
-.ds-title { font-size:.867rem; font-weight:600; color:var(--ink); margin-bottom:.65rem; display:flex; align-items:center; gap:.4rem; }
+.detail-favorite:disabled { opacity:.55; cursor:not-allowed; }
+.detail-favorite:focus-visible { outline:3px solid var(--red); outline-offset:3px; }
+.ds-title { font-size:19px; font-weight:700; color:var(--ink); margin-bottom:.65rem; display:flex; align-items:center; gap:.4rem; }
 .ds-title i { color:var(--red); }
 .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:.4rem .75rem; margin-bottom:1rem; }
-.info-item { display:flex; align-items:center; gap:.35rem; font-size:.8rem; color:var(--ink-2); }
+.info-item { display:flex; align-items:center; gap:.35rem; font-size:17px; color:var(--ink-2); line-height:1.6; }
 .info-item i { color:var(--ink-3); font-size:13px; flex-shrink:0; }
 .modal-mask { position:fixed; inset:0; background:rgba(28,26,24,.45); display:flex; align-items:center; justify-content:center; z-index:200; }
 .apply-modal { background:var(--bg-card); border-radius:16px; width:min(560px,92vw); max-height:85vh; display:flex; flex-direction:column; box-shadow:0 16px 48px rgba(28,26,24,.18); }
@@ -376,4 +432,11 @@ async function loadJob() {
 .resume-picker-upload { border-style:dashed; color:var(--ink-3); }
 .resume-picker-upload:hover { color:var(--red); }
 .icon-btn { width:28px; height:28px; border-radius:6px; border:1px solid var(--border); background:var(--bg-card); color:var(--ink-3); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; font-size:13px; }
+@media (max-width:760px) {
+  .detail-layout { grid-template-columns:minmax(0,1fr); gap:1rem; }
+  .apply-sidebar { position:static; }
+  .info-grid { grid-template-columns:minmax(0,1fr); }
+  .detail-heading-copy { min-width:calc(100% - 78px); }
+  .detail-favorite { margin-left:0; }
+}
 </style>
