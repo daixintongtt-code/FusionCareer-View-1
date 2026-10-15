@@ -108,7 +108,8 @@ const route = useRoute()
 
 /* ── Brand ── */
 .login-brand  { text-align: center; margin-bottom: 2.25rem; display: flex; flex-direction: column; align-items: center; }
-.login-zh     { font-family: var(--font-serif); font-size: 2.4rem; font-weight: 900; color: var(--red); letter-spacing: -.01em; line-height: 1.15; text-align: center; }
+.login-brand-mark { width: 72px; height: 72px; margin-bottom: .85rem; border-radius: 50%; object-fit: cover; background: #fff; border: 2px solid rgba(23,64,126,.2); box-shadow: 0 8px 20px rgba(23,64,126,.12); }
+.login-zh     { font-family: var(--font-serif); font-size: 2.55rem; font-weight: 900; color: var(--red); letter-spacing: .06em; line-height: 1.2; text-align: center; text-indent: .06em; }
 .login-en     { font-family: var(--font-sans); font-size: .82rem; font-weight: 600; color: var(--gold); letter-spacing: .24em; text-transform: uppercase; margin-top: .45rem; text-align: center; }
 .login-school { font-size: .9rem; color: var(--ink-2); margin-top: .7rem; letter-spacing: .02em; text-align: center; }
 
@@ -249,6 +250,7 @@ const route = useRoute()
 @media (max-width: 560px) {
   .login-card { padding: 1.5rem 1.4rem 1.4rem; }
   .login-zh { font-size: 2rem; }
+  .login-brand-mark { width: 62px; height: 62px; }
   .admin-corner { right: 1rem; bottom: 1rem; }
 }
 </style>
