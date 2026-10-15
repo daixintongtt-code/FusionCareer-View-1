@@ -90,18 +90,34 @@
           <!-- 我的简历 -->
           <template v-if="view==='resume'">
             <div class="card card-p">
-              <div class="panel-title"><i class="ti ti-file-description" />简历正文</div>
-              <div class="resume-content-list">
-                <div v-for="item in resumeFields" :key="item.key" class="form-group">
-                  <label class="form-label">{{ item.label }}</label>
-                  <textarea class="form-control resume-textarea" v-model="resumeForm[item.key]" />
+              <div class="resume-content-head">
+                <h2 class="panel-title"><i class="ti ti-file-description" aria-hidden="true" />简历正文</h2>
+                <div class="resume-view-switch" role="group" aria-label="简历显示方式">
+                  <button type="button" class="resume-mode-button" :aria-pressed="!resumeEditing" @click="resumeEditing = false">阅读预览</button>
+                  <button type="button" class="resume-mode-button" :aria-pressed="resumeEditing" :disabled="resumeLocked" @click="resumeEditing = true">编辑正文</button>
                 </div>
               </div>
-              <div style="display:flex;justify-content:flex-end;margin:1rem 0 1.5rem">
-                <button class="btn btn-primary" @click="saveResume"><i class="ti ti-check" />保存简历正文</button>
+              <p class="resume-read-hint">{{ resumeEditing ? '不同经历之间空一行；修改后点击“保存简历正文”生效。' : 'AI 解析结果按经历分组展示，标题与职责保留在同一段经历内。' }}</p>
+              <div v-if="resumeRefreshRequired" class="resume-refresh-notice" role="status">
+                <p>{{ loadingResume ? '正在加载简历正文…' : '简历正文尚未刷新成功，重新加载后可继续编辑或解析。' }}</p>
+                <button v-if="!loadingResume" type="button" class="btn btn-secondary btn-sm" :disabled="resumeBusy" @click="reloadResume">重新加载正文</button>
+              </div>
+              <div class="resume-content-list">
+                <section v-for="item in resumeSections" :key="item.key" class="resume-section" :aria-labelledby="`resume-heading-${item.key}`">
+                  <h3 :id="`resume-heading-${item.key}`" class="resume-section-title">{{ item.label }}</h3>
+                  <textarea v-if="resumeEditing" class="form-control resume-textarea" :aria-labelledby="`resume-heading-${item.key}`" :disabled="resumeLocked" v-model="resumeForm[item.key]" />
+                  <div v-else class="resume-section-body">
+                    <p v-for="(paragraph, index) in item.paragraphs" :key="index" class="resume-read-paragraph" :class="{ 'resume-experience': item.experience }">{{ paragraph }}</p>
+                    <p v-if="!item.paragraphs.length" class="resume-empty-field">暂未填写</p>
+                  </div>
+                </section>
+              </div>
+              <div v-if="resumeEditing" style="display:flex;justify-content:flex-end;margin:1rem 0 1.5rem">
+                <button type="button" class="btn btn-primary" :disabled="resumeLocked" @click="saveResume"><i class="ti ti-check" />{{ savingResume ? '正在保存…' : '保存简历正文' }}</button>
               </div>
               <div class="divider" />
               <div class="panel-title"><i class="ti ti-file-text" />简历文件</div>
+              <p class="resume-read-hint">上传时勾选下方选项可使用 AI 更新资料和在线简历；已有文件也可重新解析并更新。</p>
               <div v-for="(r, index) in resumes" :key="r.name" class="resume-row">
                 <div style="width:38px;height:38px;border-radius:var(--r-md);background:var(--red-light);border:1px solid var(--red-border);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--red);font-size:1rem">
                   <i :class="['ti', r.icon]" />
@@ -110,36 +126,37 @@
                   <div style="font-size:.867rem;font-weight:500;color:var(--ink)">{{ r.name }}</div>
                   <div style="font-size:.733rem;color:var(--ink-2)">{{ r.size }}</div>
                 </div>
-                <div style="display:flex;gap:.3rem">
-                  <button v-if="failedFileId===r.id" class="btn btn-secondary btn-sm" @click="retryFile(r)">
-                    <i class="ti ti-refresh" />重试解析
+                <div class="resume-file-actions">
+                  <button type="button" class="btn btn-secondary btn-sm" :disabled="resumeLocked" :aria-busy="parsingFileId===r.id" :aria-label="`${failedFileId===r.id ? '重试解析' : 'AI 重新解析'}：${r.name}`" @click="retryFile(r)">
+                    <i :class="['ti', parsingFileId===r.id ? 'ti-loader-2 upload-spinner' : 'ti-refresh']" aria-hidden="true" />{{ parsingFileId===r.id ? 'AI 解析中…' : failedFileId===r.id ? '重试解析' : 'AI 重新解析' }}
                   </button>
                   <button class="btn-icon btn" title="下载" @click="downloadFile(r)"><i class="ti ti-download" /></button>
-                  <button class="btn-icon btn" title="删除" @click="deleteFile(index)"><i class="ti ti-trash" /></button>
+                  <button class="btn-icon btn" title="删除" :disabled="resumeLocked" @click="deleteFile(index)"><i class="ti ti-trash" /></button>
                 </div>
               </div>
               <input
                 ref="fileInput"
                 type="file"
                 accept=".pdf,.docx,image/*"
+                :disabled="resumeLocked"
                 style="display:none"
                 @change="uploadFile"
               />
               <div
                 class="upload-zone"
-                :class="{ uploading: uploadingFile }"
+                :class="{ uploading: resumeLocked }"
                 style="margin-top:1rem"
-                @click="!uploadingFile && fileInput?.click()"
+                @click="!resumeLocked && fileInput?.click()"
               >
-                <i :class="['ti', uploadingFile ? 'ti-loader-2 upload-spinner' : 'ti-cloud-upload']" />
-                <div class="uz-title">{{ uploadingFile ? '正在上传并处理简历…' : '上传新简历' }}</div>
+                <i :class="['ti', resumeBusy ? 'ti-loader-2 upload-spinner' : 'ti-cloud-upload']" />
+                <div class="uz-title">{{ parsingFileId!==null ? 'AI 正在重新解析简历…' : savingResume ? '正在保存简历正文…' : uploadingFile ? '正在上传并处理简历…' : loadingResume ? '正在加载简历正文…' : resumeRefreshRequired ? '请先重新加载正文' : '上传新简历' }}</div>
                 <div class="uz-hint">支持 PDF、DOCX、JPG、PNG，单文件不超过 20 MB · {{ readQuota }}</div>
               </div>
-              <label class="profile-sync-option" :class="{ disabled: uploadingFile }">
-                <input type="checkbox" v-model="updateProfile" :disabled="uploadingFile" />
+              <label class="profile-sync-option" :class="{ disabled: resumeLocked }">
+                <input type="checkbox" v-model="updateProfile" :disabled="resumeLocked" />
                 <span class="profile-sync-check"><i class="ti ti-check" /></span>
                 <span class="profile-sync-copy">
-                  <strong>同时更新「我的资料」和在线简历</strong>
+                  <strong>使用 AI 更新「我的资料」和在线简历</strong>
                   <small>勾选后，简历将发送至配置的 AI 服务，仅用识别到的非空字段更新资料。</small>
                 </span>
               </label>
@@ -312,6 +329,7 @@ import { useToast } from '@/composables/useToast'
 import { logoutUser, readUser } from '@/lib/auth'
 import { downloadFile as downloadBlob, readJson, readToken, uploadForm } from '@/lib/api'
 import { readFavorites, removeFavorite, setFavoritesUser, subscribeFavorites } from '@/lib/favorites'
+import { splitResumeParagraphs, isResumeExperienceField } from '@/lib/resumeText.mjs'
 import {
   CITY_INTENTION_OPTIONS,
   JOB_INTENTION_OPTIONS,
@@ -496,24 +514,47 @@ const resumeFields = [
   { key:'remark', label:'备注' },
 ]
 const resumeForm = ref(Object.fromEntries(resumeFields.map(readField => [readField.key, ''])))
+const resumeEditing = ref(false)
+const loadingResume = ref(false)
+const resumeRefreshRequired = ref(true)
+const resumeSections = computed(() => resumeFields.map(field => ({
+  ...field, experience: isResumeExperienceField(field.key),
+  paragraphs: splitResumeParagraphs(resumeForm.value[field.key], field.key),
+})))
 
 async function loadResume() {
+  loadingResume.value = true
   try {
     const readResume = await readJson('/user/resume/get')
     resumeFields.forEach(readField => {
       resumeForm.value[readField.key] = readResume?.[readField.key] || ''
     })
+    resumeRefreshRequired.value = false
+    return true
   } catch (readError) {
+    resumeRefreshRequired.value = true
     toast.error(readError?.message || '加载简历失败')
+    return false
+  } finally {
+    loadingResume.value = false
   }
 }
 
+async function reloadResume() {
+  if (resumeBusy.value) return
+  if (await loadResume()) resumeEditing.value = false
+}
+
 async function saveResume() {
+  if (resumeLocked.value) return
+  savingResume.value = true
   try {
     await readJson('/user/resume/save', { method:'PUT', body:JSON.stringify(resumeForm.value) })
     toast.success('简历正文已保存')
   } catch (readError) {
     toast.error(readError?.message || '保存简历失败')
+  } finally {
+    savingResume.value = false
   }
 }
 
@@ -523,6 +564,10 @@ const deleteIndex = ref(null)
 const readQuota = ref('配额加载中')
 const updateProfile = ref(true)
 const uploadingFile = ref(false)
+const savingResume = ref(false)
+const parsingFileId = ref(null)
+const resumeBusy = computed(() => loadingResume.value || uploadingFile.value || savingResume.value || parsingFileId.value !== null)
+const resumeLocked = computed(() => resumeBusy.value || resumeRefreshRequired.value)
 const failedFileId = ref(null)
 
 // ── 简历文件（动态加载）──
@@ -693,6 +738,7 @@ async function submitEditApply() {
 }
 
 async function uploadFile(e) {
+  if (resumeLocked.value) { e.target.value = ''; return }
   const file = e.target.files?.[0]
   if (!file) return
   const ext = file.name.split('.').pop().toLowerCase()
@@ -717,8 +763,11 @@ async function uploadFile(e) {
       failedFileId.value = null
       const readCount = (readResult.updatedProfileFields?.length || 0)
         + (readResult.updatedResumeFields?.length || 0)
-      toast.success(`简历上传成功，已更新 ${readCount} 个字段`)
-      await Promise.all([loadProfile(), loadResume()])
+      const [, resumeLoaded] = await Promise.all([loadProfile(), loadResume()])
+      if (resumeLoaded) {
+        resumeEditing.value = false
+        toast.success(`简历上传成功，已更新 ${readCount} 个字段`)
+      } else toast.error('AI 解析已完成，请点击“重新加载正文”获取结果。')
     } else if (readResult?.parseStatus === 'FAILED') {
       failedFileId.value = readResult.file?.id || null
       toast.error(readResult.message || '文件已保存，资料更新失败')
@@ -735,14 +784,22 @@ async function uploadFile(e) {
 }
 
 async function retryFile(readFile) {
+  if (resumeLocked.value) return
+  parsingFileId.value = readFile.id
   try {
-    const readResult = await readJson(`/user/resume/file/${readFile.id}/parse`, { method:'POST' })
+    const readResult = await readJson(`/user/resume/file/${encodeURIComponent(readFile.id)}/parse`, { method:'POST' })
     if (readResult?.parseStatus !== 'SUCCESS') throw new Error(readResult?.message || '解析失败')
     failedFileId.value = null
-    await Promise.all([loadProfile(), loadResume()])
-    toast.success('资料更新成功')
+    const [, resumeLoaded] = await Promise.all([loadProfile(), loadResume()])
+    if (resumeLoaded) {
+      resumeEditing.value = false
+      toast.success('AI 解析完成，已更新在线简历')
+    } else toast.error('AI 解析已完成，请点击“重新加载正文”获取结果。')
   } catch (readError) {
+    failedFileId.value = readFile.id
     toast.error(readError?.message || '解析失败，请稍后重试')
+  } finally {
+    parsingFileId.value = null
   }
 }
 
@@ -811,14 +868,33 @@ function cancelDeleteResume() {
 .span-2 { grid-column: span 2; }
 .form-label { display: block; font-size: .98rem; font-weight: 650; margin-bottom: .58rem; color: var(--ink); }
 .form-control { width: 100%; min-height: 56px; border-radius: 16px; font-size: 1rem; padding: 0 1.1rem; }
-.resume-content-list { display: flex; flex-direction: column; gap: 1.1rem; }
+.resume-content-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.resume-content-head .panel-title { margin-bottom: 0; }
+.resume-view-switch { display: inline-flex; gap: .25rem; padding: .25rem; max-width: 100%; flex-wrap: wrap; background: var(--bg-soft); border: 1px solid var(--border); border-radius: 14px; }
+.resume-mode-button { min-height: 40px; padding: .55rem .8rem; border: 0; border-radius: 10px; background: transparent; color: var(--ink-2); font-size: .85rem; font-weight: 500; }
+.resume-mode-button[aria-pressed='true'] { background: var(--red-light); color: var(--red); font-weight: 650; }
+.resume-mode-button:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; }
+.resume-mode-button:disabled { opacity: .5; cursor: not-allowed; }
+.resume-read-hint { margin: .75rem 0 .4rem; color: var(--ink-2); font-size: .83rem; line-height: 1.7; }
+.resume-refresh-notice { margin: 1rem 0; padding: .8rem 1rem; border: 1px solid var(--red-border); border-radius: 10px; background: var(--red-light); color: var(--ink-2); }
+.resume-refresh-notice p { margin: 0 0 .5rem; line-height: 1.7; }
+.resume-content-list { display: flex; flex-direction: column; }
+.resume-section { min-width: 0; padding: 1.1rem 0; border-bottom: 1px solid var(--border); }
+.resume-section:last-child { border-bottom: 0; }
+.resume-section-title { margin-bottom: .65rem; color: var(--ink); font-size: .98rem; font-weight: 650; line-height: 1.5; }
+.resume-read-paragraph { margin: 0; color: var(--ink-2); font-size: .95rem; line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; }
+.resume-read-paragraph + .resume-read-paragraph { margin-top: .65rem; }
+.resume-experience { padding: .85rem 1rem; border: 1px solid var(--border); border-left: 3px solid var(--red-border); border-radius: 10px; background: var(--bg-soft); }
+.resume-experience + .resume-experience { margin-top: 1rem; }
+.resume-empty-field { color: var(--ink-2); font-size: .88rem; line-height: 1.7; }
 .resume-textarea {
   min-height: 4.5rem; field-sizing: content; line-height: 1.65;
   padding-top: .9rem; padding-bottom: .9rem; resize: vertical;
 }
 .btn { min-height: 46px; padding: 0 1.3rem; border-radius: 14px; font-size: .98rem; }
 
-.resume-row { display: flex; align-items: center; gap: 1.25rem; padding: 1.25rem 1.35rem; background: var(--bg-soft); border: 1px solid var(--border); border-radius: 20px; margin-bottom: .95rem; }
+.resume-row { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; padding: 1.25rem 1.35rem; background: var(--bg-soft); border: 1px solid var(--border); border-radius: 20px; margin-bottom: .95rem; }
+.resume-file-actions { display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; }
 .upload-zone { min-height: 165px; border-radius: 24px; cursor: pointer; transition: all .2s ease; }
 .upload-zone:hover { background: #fff6f7; border-color: var(--red); transform: translateY(-1px); }
 .upload-zone.uploading { cursor: wait; opacity: .72; pointer-events: none; }
