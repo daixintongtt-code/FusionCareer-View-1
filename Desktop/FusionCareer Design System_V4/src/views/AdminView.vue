@@ -508,9 +508,17 @@
 
             <!-- 平台内投递：问卷编辑器 -->
             <div v-else>
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+              <div class="questionnaire-editor-head">
                 <div style="font-size:.8rem;font-weight:600;color:var(--ink-2)">投递问卷题目</div>
-                <button class="btn btn-secondary btn-sm" @click="addQuestion"><i class="ti ti-plus" />添加题目</button>
+                <div class="questionnaire-editor-actions">
+                  <QuestionnaireTemplates
+                    :questions="nj.questions"
+                    :editing-id="editingId"
+                    :job="nj"
+                    @apply="applyQuestionnaireTemplate"
+                  />
+                  <button class="btn btn-secondary btn-sm" @click="addQuestion"><i class="ti ti-plus" />添加题目</button>
+                </div>
               </div>
 
               <div v-if="nj.questions.length===0" style="text-align:center;padding:2rem;color:var(--ink-3);font-size:.8rem;border:1.5px dashed var(--border-mid);border-radius:var(--r-md)">
@@ -999,6 +1007,7 @@
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import AppToast from '@/components/AppToast.vue'
 import PageJump from '@/components/PageJump.vue'
+import QuestionnaireTemplates from '@/components/QuestionnaireTemplates.vue'
 import { useToast } from '@/composables/useToast'
 import { logoutUser, readUser } from '@/lib/auth'
 import { downloadFile as downloadBlob, readJson, uploadForm } from '@/lib/api'
@@ -1023,6 +1032,7 @@ import {
   validateJobImportFile,
 } from '@/lib/jobImport.mjs'
 import { EDU_OPTIONS, formatCities, normalizeJobRequirements } from '@/lib/jobRequirements.mjs'
+import { canApplyTemplateToJob, cloneTemplateQuestions } from '@/lib/questionnaireTemplates.mjs'
 
 const toast = useToast()
 const v     = ref('list')
@@ -1656,6 +1666,18 @@ function addQuestion() {
     placeholder: '',
   })
 }
+function applyQuestionnaireTemplate(questions) {
+  if (!canApplyTemplateToJob(editingId.value, nj.value)) {
+    toast.error('仅新建岗位或尚无投递的草稿可使用模板')
+    return
+  }
+  try {
+    nj.value.questions = cloneTemplateQuestions(questions)
+    toast.success('已应用模板，请核对题目后保存岗位')
+  } catch (error) {
+    toast.error(error?.message || '应用模板失败，请重新选择')
+  }
+}
 function moveQ(idx, dir) {
   const qs = nj.value.questions
   const target = idx + dir
@@ -2082,6 +2104,14 @@ async function exportData() {
 </script>
 
 <style scoped>
+.questionnaire-editor-head, .questionnaire-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
+.questionnaire-editor-head { justify-content: space-between; margin-bottom: .75rem; }
+.questionnaire-editor-actions { justify-content: flex-end; }
 /* ── 简历导出 ── */
 .resume-export-card {
   margin-bottom: .875rem;
