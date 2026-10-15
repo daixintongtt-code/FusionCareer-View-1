@@ -6,6 +6,7 @@
     <div class="login-center">
       <!-- Brand -->
       <div class="login-brand fade-up">
+        <img class="login-brand-mark" src="/brand/fusion-career-logo.png" alt="复新生涯标志" />
         <div class="login-zh">复新生涯</div>
         <div class="login-en">FusionCareer</div>
         <div class="login-school">复旦大学新闻学院 · 就业与职业发展平台</div>
