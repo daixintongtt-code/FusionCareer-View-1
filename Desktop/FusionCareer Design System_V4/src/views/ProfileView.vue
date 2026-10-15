@@ -163,16 +163,24 @@
                 <div class="uz-title">{{ parsingFileId!==null ? 'AI 正在重新解析简历…' : savingResume ? '正在保存简历正文…' : uploadingFile ? '正在上传并处理简历…' : loadingResume ? '正在加载简历正文…' : resumeRefreshRequired ? '请先重新加载正文' : '上传新简历' }}</div>
                 <div class="uz-hint">支持 PDF、DOCX、JPG、PNG，单文件不超过 20 MB · {{ readQuota }}</div>
               </div>
+              <section class="profile-update-guide" aria-label="简历上传与资料更新说明">
+                <div class="profile-update-guide-title"><i class="ti ti-info-circle" />上传后，系统会如何处理？</div>
+                <ul>
+                  <li><strong>始终保存文件：</strong>上传的简历会存入「我的简历」，可用于后续投递。</li>
+                  <li><strong>按需更新资料：</strong>勾选下方选项后，系统才会从本次简历中识别信息并更新「我的资料」和在线简历。</li>
+                  <li><strong>不会清空原资料：</strong>未识别到的字段保持不变；不勾选则只保存文件，不修改任何资料。</li>
+                </ul>
+              </section>
               <label class="profile-sync-option" :class="{ disabled: resumeLocked }">
                 <input type="checkbox" v-model="updateProfile" :disabled="resumeLocked" />
                 <span class="profile-sync-check"><i class="ti ti-check" /></span>
                 <span class="profile-sync-copy">
-                  <strong>使用 AI 更新「我的资料」和在线简历</strong>
-                  <small>勾选后，简历将发送至配置的 AI 服务，仅用识别到的非空字段更新资料。</small>
+                  <strong>从本次简历更新「我的资料」和在线简历</strong>
+                  <small>仅在勾选后执行；系统只写入识别到的非空字段，不会覆盖为空。</small>
                 </span>
               </label>
               <div class="profile-sync-tip">
-                <i class="ti ti-shield-check" />仅在本次上传中生效，未识别出的资料不会被清空
+                <i class="ti ti-shield-check" />此选择仅对本次上传生效，上传完成后可在「我的资料」中核对并手动修改
               </div>
             </div>
           </template>
@@ -964,6 +972,12 @@ function cancelDeleteResume() {
 .profile-sync-copy small { color: var(--ink-2); font-size: .83rem; line-height: 1.55; }
 .profile-sync-tip { display: flex; align-items: center; gap: .4rem; margin: .55rem .2rem 0; color: var(--ink-3); font-size: .76rem; }
 .profile-sync-tip i { color: #2f7d4a; font-size: .9rem; }
+.profile-update-guide { margin-top:1.25rem; padding:1rem 1.1rem; border:1px solid rgba(23,64,126,.16); border-radius:18px; background:#f5f8fd; color:var(--ink-2); }
+.profile-update-guide-title { display:flex; align-items:center; gap:.45rem; color:#17407e; font-size:.92rem; font-weight:750; }
+.profile-update-guide-title i { font-size:1rem; }
+.profile-update-guide ul { margin:.65rem 0 0 1.25rem; display:grid; gap:.3rem; font-size:.8rem; line-height:1.6; }
+.profile-update-guide li { list-style:disc; }
+.profile-update-guide strong { color:var(--ink); }
 .btn-icon { width: 44px; height: 44px; border-radius: 15px; display: inline-flex; align-items: center; justify-content: center; }
 .btn-icon i { font-size: 1.12rem; }
 
