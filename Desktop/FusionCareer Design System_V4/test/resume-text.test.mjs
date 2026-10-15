@@ -54,16 +54,26 @@ test('profile resume template compiles with its real script bindings', () => {
   assert.deepEqual(template.errors, [])
 })
 
-async function setupProfile(t, resume = {}) {
+async function setupProfile(t, resume = {}, initializeProfile = true) {
   const key = `__resumeTextTest${harnessNumber++}`
   const harness = {
-    resume, requests: [], saveFailure: false, errors: [], successes: [],
+    resume, profile: { realName: '原资料', major: '原专业' }, requests: [], saveFailure: false, errors: [], successes: [],
     ref, computed, splitResumeParagraphs, isResumeExperienceField, watch() {}, onMounted() {}, onBeforeUnmount() {},
     useRoute: () => ({ query: { tab: 'resume' } }), useRouter: () => ({ push() {} }),
     useToast: () => ({ success(message) { harness.successes.push(message) }, error(message) { harness.errors.push(message) } }),
     readUser: async () => ({ id: 2, role: 'NORMAL', studentId: 'demo' }), readToken: () => 'local-demo-NORMAL',
     readJson: async (path, options) => {
       harness.requests.push({ path, options })
+      if (path === '/user/profile/get') {
+        if (harness.profileReadFailure) throw new Error(harness.profileReadFailure)
+        return harness.profileReadRequest ? harness.profileReadRequest() : { ...harness.profile }
+      }
+      if (path === '/user/profile/save') {
+        if (harness.profileSaveFailure) throw new Error(harness.profileSaveFailure)
+        if (harness.profileSaveRequest) return harness.profileSaveRequest()
+        harness.profile = JSON.parse(options.body)
+        return {}
+      }
       if (path === '/user/resume/get') {
         if (harness.resumeReadFailure) throw new Error(harness.resumeReadFailure)
         return harness.resume
@@ -79,6 +89,7 @@ async function setupProfile(t, resume = {}) {
     },
     uploadForm: async (path, body) => {
       harness.requests.push({ path, options: { method: 'POST', body } })
+      if (harness.uploadRequest) return harness.uploadRequest()
       return { parseStatus: 'SUCCESS', updatedResumeFields: ['internship', 'campus'] }
     },
     parsePreferenceList: () => [],
@@ -98,7 +109,9 @@ async function setupProfile(t, resume = {}) {
   }))
   const executable = compiled.content.replace(/from\s+(['"])([^'"]+)\1/g, (_, quote, source) => `from ${quote}${modules.get(source)}${quote}`)
   const component = await import(`data:text/javascript;base64,${Buffer.from(executable).toString('base64')}#${key}`)
-  return { harness, state: component.default.setup({}, { expose() {} }) }
+  const state = component.default.setup({}, { expose() {} })
+  if (initializeProfile) await state.loadProfile()
+  return { harness, state }
 }
 
 test('profile starts in reading mode and derives separate resume paragraphs', async t => {
@@ -256,7 +269,7 @@ test('completed parsing with a failed refresh locks old text until a GET-only re
 test('an initial resume read failure cannot save an empty form over existing server text', async t => {
   const { state, harness } = await setupProfile(t)
   await state.saveResume()
-  assert.equal(harness.requests.length, 0)
+  assert.deepEqual(harness.requests.map(request => request.path), ['/user/profile/get'])
   harness.resumeReadFailure = '读取失败'
   assert.equal(await state.loadResume(), false)
   await state.saveResume()
@@ -278,4 +291,136 @@ test('a successful upload with a failed refresh also blocks saving stale text', 
   assert.equal(state.resumeLocked.value, true)
   await state.saveResume()
   assert.equal(harness.requests.some(request => request.path === '/user/resume/save'), false)
+})
+
+test('AI reparsing prevents profile saving and cancellation until refresh finishes', async t => {
+  const { state, harness } = await setupProfile(t)
+  await state.loadResume()
+  let finish
+  harness.parseRequest = () => new Promise(resolve => { finish = resolve })
+  const parsing = state.retryFile({ id: 'file-a' })
+  const requestCount = harness.requests.length
+  await state.saveProfile()
+  assert.equal(harness.requests.length, requestCount)
+  assert.equal(state.profileLocked.value, true)
+  await state.reloadProfile()
+  assert.equal(harness.requests.length, requestCount)
+  harness.profile = { realName: 'AI 新资料' }
+  finish({ parseStatus: 'SUCCESS' })
+  await parsing
+  assert.equal(state.form.value.realName, 'AI 新资料')
+  assert.equal(state.profileLocked.value, false)
+})
+
+test('AI upload also prevents a concurrent profile PUT', async t => {
+  const { state, harness } = await setupProfile(t)
+  await state.loadResume()
+  let finish
+  harness.uploadRequest = () => new Promise(resolve => { finish = resolve })
+  const uploading = state.uploadFile({ target: { files: [new File(['fixture'], 'demo.pdf')], value: 'demo.pdf' } })
+  await state.saveProfile()
+  assert.equal(harness.requests.some(request => request.path === '/user/profile/save'), false)
+  assert.equal(state.profileLocked.value, true)
+  finish({ parseStatus: 'SUCCESS' })
+  await uploading
+  assert.equal(state.profileLocked.value, false)
+})
+
+test('a pending profile save prevents duplicate saves, uploads and all resume writes', async t => {
+  const { state, harness } = await setupProfile(t)
+  await state.loadResume()
+  let finish
+  harness.profileSaveRequest = () => new Promise(resolve => { finish = resolve })
+  const saving = state.saveProfile()
+  assert.equal(state.profileLocked.value, true)
+  const requestCount = harness.requests.length
+  await state.saveProfile()
+  await state.retryFile({ id: 'file-a' })
+  await state.saveResume()
+  await state.uploadFile({ target: { files: [new File(['fixture'], 'demo.pdf')], value: 'demo.pdf' } })
+  assert.equal(harness.requests.length, requestCount)
+  finish({})
+  await saving
+  assert.equal(state.profileLocked.value, false)
+  assert.equal(state.resumeBusy.value, false)
+})
+
+test('a failed profile refresh after parsing cannot overwrite the AI profile and recovers by GET only', async t => {
+  const { state, harness } = await setupProfile(t)
+  await state.loadResume()
+  harness.profile = { realName: 'AI 新资料', major: 'AI 新专业' }
+  harness.profileReadFailure = '读取资料暂时失败'
+  await state.retryFile({ id: 'file-a' })
+  assert.equal(state.form.value.realName, '原资料')
+  assert.equal(state.profileRefreshRequired.value, true)
+  assert.equal(state.profileLocked.value, true)
+  assert.equal(harness.successes.length, 0)
+  const requestCount = harness.requests.length
+  await state.saveProfile()
+  await state.retryFile({ id: 'file-a' })
+  assert.equal(harness.requests.length, requestCount)
+  await state.reloadProfile()
+  assert.equal(state.profileLocked.value, true)
+  harness.profileReadFailure = ''
+  await state.reloadProfile()
+  assert.deepEqual(harness.requests.slice(requestCount).map(request => request.path), ['/user/profile/get', '/user/profile/get'])
+  assert.equal(state.profileLocked.value, false)
+  assert.equal(state.form.value.realName, 'AI 新资料')
+  await state.saveProfile()
+  assert.equal(harness.profile.realName, 'AI 新资料')
+  assert.equal(harness.profile.major, 'AI 新专业')
+})
+
+test('a failed profile refresh after AI upload keeps the profile locked without a success toast', async t => {
+  const { state, harness } = await setupProfile(t)
+  await state.loadResume()
+  harness.profile = { realName: 'AI 新资料' }
+  harness.profileReadFailure = '读取失败'
+  await state.uploadFile({ target: { files: [new File(['fixture'], 'demo.pdf')], value: 'demo.pdf' } })
+  await state.saveProfile()
+  assert.equal(harness.profile.realName, 'AI 新资料')
+  assert.equal(state.profileLocked.value, true)
+  assert.equal(harness.successes.length, 0)
+  assert.equal(harness.requests.some(request => request.path === '/user/profile/save'), false)
+})
+
+test('an initial profile read failure cannot submit an empty profile or start parsing', async t => {
+  const { state, harness } = await setupProfile(t, {}, false)
+  await state.loadResume()
+  await state.saveProfile()
+  assert.equal(harness.requests.some(request => request.path === '/user/profile/save'), false)
+  harness.profileReadFailure = '读取失败'
+  assert.equal(await state.loadProfile(), false)
+  await state.retryFile({ id: 'file-a' })
+  assert.equal(harness.requests.some(request => request.path.endsWith('/parse')), false)
+  harness.profileReadFailure = ''
+  await state.reloadProfile()
+  assert.equal(state.profileLocked.value, false)
+})
+
+test('a pending profile read blocks saving and ignores duplicate recovery clicks', async t => {
+  const { state, harness } = await setupProfile(t, {}, false)
+  let finish
+  harness.profileReadRequest = () => new Promise(resolve => { finish = resolve })
+  const loading = state.reloadProfile()
+  const requestCount = harness.requests.length
+  await state.saveProfile()
+  await state.reloadProfile()
+  assert.equal(harness.requests.length, requestCount)
+  finish({ realName: '读取结果' })
+  await loading
+  assert.equal(state.form.value.realName, '读取结果')
+  assert.equal(state.profileLocked.value, false)
+})
+
+test('a failed profile save preserves edits and releases the lock for retry', async t => {
+  const { state, harness } = await setupProfile(t)
+  state.form.value.realName = '未保存编辑'
+  harness.profileSaveFailure = '保存失败'
+  await state.saveProfile()
+  assert.equal(state.form.value.realName, '未保存编辑')
+  assert.equal(state.profileLocked.value, false)
+  harness.profileSaveFailure = ''
+  await state.saveProfile()
+  assert.equal(harness.profile.realName, '未保存编辑')
 })

@@ -33,6 +33,12 @@
           <template v-if="view==='info'">
             <div class="card card-p">
               <div class="panel-title"><i class="ti ti-user" />基本信息</div>
+              <div v-if="profileRefreshRequired" class="profile-refresh-notice" role="status">
+                <p>{{ loadingProfile ? '正在加载资料…' : '资料尚未刷新成功，重新加载后可继续编辑或解析。' }}</p>
+                <button v-if="!loadingProfile" type="button" class="btn btn-secondary btn-sm" :disabled="resumeBusy" @click="reloadProfile">重新加载资料</button>
+              </div>
+              <p v-else-if="profileLocked" class="resume-read-hint" role="status">{{ savingProfile ? '正在保存资料…' : '正在处理简历或资料，完成后可继续编辑。' }}</p>
+              <fieldset class="profile-editor" :disabled="profileLocked" :inert="profileLocked">
               <div class="grid-2">
                 <div class="form-group"><label class="form-label">姓名</label><input class="form-control" v-model="form.realName" /></div>
                 <div class="form-group"><label class="form-label">学号</label><input class="form-control" :value="form.sid" readonly /></div>
@@ -81,9 +87,10 @@
                 <div class="form-group"><label class="form-label">理想方向</label><textarea class="form-control" v-model="form.intentionDream" /></div>
               </div>
               <div style="display:flex;justify-content:flex-end;gap:.5rem;margin-top:1rem">
-                <button class="btn btn-secondary" @click="loadProfile">取消</button>
-                <button class="btn btn-primary" @click="saveProfile"><i class="ti ti-check" />保存</button>
+                <button type="button" class="btn btn-secondary" :disabled="profileLocked" @click="reloadProfile">取消</button>
+                <button type="button" class="btn btn-primary" :disabled="profileLocked" @click="saveProfile"><i class="ti ti-check" />{{ savingProfile ? '正在保存…' : '保存' }}</button>
               </div>
+              </fieldset>
             </div>
           </template>
 
@@ -98,6 +105,10 @@
                 </div>
               </div>
               <p class="resume-read-hint">{{ resumeEditing ? '不同经历之间空一行；修改后点击“保存简历正文”生效。' : 'AI 解析结果按经历分组展示，标题与职责保留在同一段经历内。' }}</p>
+              <div v-if="profileRefreshRequired" class="profile-refresh-notice" role="status">
+                <p>{{ loadingProfile ? '正在加载资料…' : '资料尚未刷新成功，重新加载后可继续编辑或解析。' }}</p>
+                <button v-if="!loadingProfile" type="button" class="btn btn-secondary btn-sm" :disabled="resumeBusy" @click="reloadProfile">重新加载资料</button>
+              </div>
               <div v-if="resumeRefreshRequired" class="resume-refresh-notice" role="status">
                 <p>{{ loadingResume ? '正在加载简历正文…' : '简历正文尚未刷新成功，重新加载后可继续编辑或解析。' }}</p>
                 <button v-if="!loadingResume" type="button" class="btn btn-secondary btn-sm" :disabled="resumeBusy" @click="reloadResume">重新加载正文</button>
@@ -464,8 +475,12 @@ function removeSavedJob(readJobId) {
 const form = ref({ realName:'', sid:'', gender:'', birthDate:'', politicalStatus:'',
   phone:'', email:'', wechat:'', hometown:'', grade:'', major:'', eduLevel:'', supervisor:'',
   intentionOrders:[], intentionCities:[], intentionDream:'', mindset:'' })
+const loadingProfile = ref(false)
+const savingProfile = ref(false)
+const profileRefreshRequired = ref(true)
 
 async function loadProfile() {
+  loadingProfile.value = true
   try {
     const [readProfile, readCurrentUser] = await Promise.all([
       readJson('/user/profile/get'), readUser(),
@@ -483,11 +498,23 @@ async function loadProfile() {
       intentionCities: parsePreferenceList(readValue.intentionCity),
       intentionDream: readValue.intentionDream || '', mindset: readValue.mindset || '',
     }
+    profileRefreshRequired.value = false
+    return true
   } catch (readError) {
+    profileRefreshRequired.value = true
     toast.error(readError?.message || '加载资料失败')
+    return false
+  } finally {
+    loadingProfile.value = false
   }
 }
+async function reloadProfile() {
+  if (resumeBusy.value) return
+  await loadProfile()
+}
 async function saveProfile() {
+  if (profileLocked.value) return
+  savingProfile.value = true
   try {
     const updateProfile = { ...form.value }
     delete updateProfile.sid
@@ -503,7 +530,11 @@ async function saveProfile() {
       body: JSON.stringify(updateProfile),
     })
     toast.success('资料保存成功')
-  } catch (readError) { toast.error(readError?.message || '保存失败，请重试') }
+  } catch (readError) {
+    toast.error(readError?.message || '保存失败，请重试')
+  } finally {
+    savingProfile.value = false
+  }
 }
 
 const resumeFields = [
@@ -545,6 +576,15 @@ async function reloadResume() {
   if (await loadResume()) resumeEditing.value = false
 }
 
+async function refreshParsedData() {
+  const [profileLoaded, resumeLoaded] = await Promise.all([loadProfile(), loadResume()])
+  if (resumeLoaded) resumeEditing.value = false
+  if (profileLoaded && resumeLoaded) return true
+  if (!profileLoaded && !resumeLoaded) toast.error('AI 解析已完成，请重新加载资料和正文获取结果。')
+  else toast.error(`AI 解析已完成，请点击“重新加载${profileLoaded ? '正文' : '资料'}”获取结果。`)
+  return false
+}
+
 async function saveResume() {
   if (resumeLocked.value) return
   savingResume.value = true
@@ -566,8 +606,9 @@ const updateProfile = ref(true)
 const uploadingFile = ref(false)
 const savingResume = ref(false)
 const parsingFileId = ref(null)
-const resumeBusy = computed(() => loadingResume.value || uploadingFile.value || savingResume.value || parsingFileId.value !== null)
-const resumeLocked = computed(() => resumeBusy.value || resumeRefreshRequired.value)
+const resumeBusy = computed(() => loadingProfile.value || savingProfile.value || loadingResume.value || uploadingFile.value || savingResume.value || parsingFileId.value !== null)
+const profileLocked = computed(() => resumeBusy.value || profileRefreshRequired.value)
+const resumeLocked = computed(() => resumeBusy.value || resumeRefreshRequired.value || profileRefreshRequired.value)
 const failedFileId = ref(null)
 
 // ── 简历文件（动态加载）──
@@ -763,11 +804,9 @@ async function uploadFile(e) {
       failedFileId.value = null
       const readCount = (readResult.updatedProfileFields?.length || 0)
         + (readResult.updatedResumeFields?.length || 0)
-      const [, resumeLoaded] = await Promise.all([loadProfile(), loadResume()])
-      if (resumeLoaded) {
-        resumeEditing.value = false
+      if (await refreshParsedData()) {
         toast.success(`简历上传成功，已更新 ${readCount} 个字段`)
-      } else toast.error('AI 解析已完成，请点击“重新加载正文”获取结果。')
+      }
     } else if (readResult?.parseStatus === 'FAILED') {
       failedFileId.value = readResult.file?.id || null
       toast.error(readResult.message || '文件已保存，资料更新失败')
@@ -790,11 +829,9 @@ async function retryFile(readFile) {
     const readResult = await readJson(`/user/resume/file/${encodeURIComponent(readFile.id)}/parse`, { method:'POST' })
     if (readResult?.parseStatus !== 'SUCCESS') throw new Error(readResult?.message || '解析失败')
     failedFileId.value = null
-    const [, resumeLoaded] = await Promise.all([loadProfile(), loadResume()])
-    if (resumeLoaded) {
-      resumeEditing.value = false
+    if (await refreshParsedData()) {
       toast.success('AI 解析完成，已更新在线简历')
-    } else toast.error('AI 解析已完成，请点击“重新加载正文”获取结果。')
+    }
   } catch (readError) {
     failedFileId.value = readFile.id
     toast.error(readError?.message || '解析失败，请稍后重试')
@@ -866,6 +903,7 @@ function cancelDeleteResume() {
 .panel-title i { color: var(--red); font-size: 1.28rem; }
 .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem 1.55rem; }
 .span-2 { grid-column: span 2; }
+.profile-editor { min-width: 0; margin: 0; padding: 0; border: 0; }
 .form-label { display: block; font-size: .98rem; font-weight: 650; margin-bottom: .58rem; color: var(--ink); }
 .form-control { width: 100%; min-height: 56px; border-radius: 16px; font-size: 1rem; padding: 0 1.1rem; }
 .resume-content-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
@@ -876,8 +914,8 @@ function cancelDeleteResume() {
 .resume-mode-button:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; }
 .resume-mode-button:disabled { opacity: .5; cursor: not-allowed; }
 .resume-read-hint { margin: .75rem 0 .4rem; color: var(--ink-2); font-size: .83rem; line-height: 1.7; }
-.resume-refresh-notice { margin: 1rem 0; padding: .8rem 1rem; border: 1px solid var(--red-border); border-radius: 10px; background: var(--red-light); color: var(--ink-2); }
-.resume-refresh-notice p { margin: 0 0 .5rem; line-height: 1.7; }
+.profile-refresh-notice, .resume-refresh-notice { margin: 1rem 0; padding: .8rem 1rem; border: 1px solid var(--red-border); border-radius: 10px; background: var(--red-light); color: var(--ink-2); }
+.profile-refresh-notice p, .resume-refresh-notice p { margin: 0 0 .5rem; line-height: 1.7; }
 .resume-content-list { display: flex; flex-direction: column; }
 .resume-section { min-width: 0; padding: 1.1rem 0; border-bottom: 1px solid var(--border); }
 .resume-section:last-child { border-bottom: 0; }
