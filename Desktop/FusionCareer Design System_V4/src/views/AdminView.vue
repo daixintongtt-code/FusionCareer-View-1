@@ -135,13 +135,42 @@
           </div>
 
           <!-- 工具栏 -->
-          <div style="display:flex;align-items:center;gap:.625rem;margin-bottom:1.1rem;flex-wrap:wrap">
-            <input class="form-control" style="flex:1;min-width:180px;padding:.5rem .875rem" v-model="sk" placeholder="搜索岗位名称、公司..." @keyup.enter="searchAdminJobs" />
-            <select class="form-control" style="min-width:110px;padding:.5rem .875rem" v-model="sf">
-              <option value="">全部状态</option><option value="PUBLISHED">发布中</option><option value="RECOMMENDED">推荐中</option><option value="OFFLINE">未发布</option><option value="EXPIRED">投递已结束</option>
-            </select>
-            <button class="btn btn-secondary btn-sm" @click="searchAdminJobs"><i class="ti ti-search" />搜索</button>
-          </div>
+          <form class="card admin-job-filters" aria-label="岗位筛选" @submit.prevent="searchAdminJobs">
+            <div class="admin-filter-search">
+              <label class="admin-filter-keyword" for="admin-job-keyword">关键词
+                <input id="admin-job-keyword" class="form-control" v-model="sk" placeholder="搜索岗位名称、公司…" maxlength="200" />
+              </label>
+              <button type="submit" class="btn btn-primary btn-sm"><i class="ti ti-search" aria-hidden="true" />搜索</button>
+              <button type="button" class="btn btn-secondary btn-sm" @click="resetAdminJobFilters">重置筛选</button>
+            </div>
+            <div class="admin-filter-grid">
+              <label for="admin-job-province">省份
+                <select id="admin-job-province" class="form-control" v-model="jobFilters.province" @change="changeAdminProvince">
+                  <option value="">全部省份</option><option v-for="province in Object.keys(PROVINCES)" :key="province" :value="province">{{ province }}</option>
+                </select>
+              </label>
+              <label for="admin-job-city">城市
+                <select id="admin-job-city" class="form-control" v-model="jobFilters.city" :disabled="!jobFilters.province" @change="changeAdminJobFilters">
+                  <option value="">{{ jobFilters.province ? '全部城市' : '请先选省份' }}</option><option v-for="city in PROVINCES[jobFilters.province] || []" :key="city" :value="city">{{ city }}</option>
+                </select>
+              </label>
+              <label for="admin-job-category">岗位类型
+                <select id="admin-job-category" class="form-control" v-model="jobFilters.category" @change="changeAdminJobFilters">
+                  <option value="">全部岗位类型</option><option v-for="item in JOB_CATEGORIES" :key="item.value" :value="item.value">{{ item.label }}</option>
+                </select>
+              </label>
+              <label for="admin-job-recruit">招聘类型
+                <select id="admin-job-recruit" class="form-control" v-model="jobFilters.recruit" @change="changeAdminJobFilters">
+                  <option value="">全部招聘类型</option><option v-for="item in RECRUIT_TYPES" :key="item.value" :value="item.value">{{ item.label }}</option>
+                </select>
+              </label>
+              <label for="admin-job-status">岗位状态
+                <select id="admin-job-status" class="form-control" v-model="sf" @change="changeAdminJobFilters">
+                  <option value="">全部状态</option><option value="PUBLISHED">发布中</option><option value="RECOMMENDED">推荐中</option><option value="OFFLINE">未发布</option><option value="EXPIRED">投递已结束</option>
+                </select>
+              </label>
+            </div>
+          </form>
 
           <!-- 批量操作栏 -->
           <div v-if="selected.length" style="display:flex;align-items:center;gap:.5rem;padding:.55rem .875rem;background:var(--red-light);border:1px solid var(--red-border);border-radius:var(--r-md);margin-bottom:.875rem;font-size:.8rem;color:var(--red);flex-wrap:wrap">
@@ -155,15 +184,18 @@
 
           <!-- 表格 -->
           <div class="card" style="overflow:hidden">
-            <table class="data-table">
+            <table class="data-table" :aria-busy="jobsLoading">
               <thead>
                 <tr>
-                  <th class="col-check"><input type="checkbox" :checked="filteredJobs.length>0 && filteredJobs.every(j=>selected.includes(j.id))" @change="e=>toggleAll(e.target.checked)" /></th>
+                  <th class="col-check"><input type="checkbox" aria-label="选择本页全部岗位" :disabled="jobsLoading || !filteredJobs.length" :checked="filteredJobs.length>0 && filteredJobs.every(j=>selected.includes(j.id))" @change="e=>toggleAll(e.target.checked)" /></th>
                   <th>岗位名称</th><th>公司</th><th>城市</th><th>投递期限</th><th>状态</th><th>投递数</th><th>推荐</th><th>操作</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="j in filteredJobs" :key="j.id">
+                <tr v-if="jobsLoading"><td colspan="9" class="admin-list-state" role="status">正在加载岗位…</td></tr>
+                <tr v-else-if="jobsError"><td colspan="9" class="admin-list-state" role="alert"><p>{{ jobsError }}</p><button type="button" class="btn btn-secondary btn-sm" @click="loadJobs">重新加载</button></td></tr>
+                <tr v-else-if="!filteredJobs.length"><td colspan="9" class="admin-list-state">暂无符合条件的岗位</td></tr>
+                <tr v-for="j in filteredJobs" v-else :key="j.id">
                   <td class="col-check"><input type="checkbox" :checked="selected.includes(j.id)" @change="toggleSel(j.id)" /></td>
                   <td><span style="font-weight:500;cursor:pointer;color:var(--ink)" @click="openEdit(j)">{{ j.positionName }}</span></td>
                   <td>{{ j.companyName }}</td>
@@ -188,11 +220,11 @@
             </table>
           </div>
           <div class="pagination" style="margin-top:.875rem">
-            <span style="font-size:.773rem;color:var(--ink-3);margin-right:auto">共 {{ jobTotal }} 条岗位</span>
-            <button class="page-btn" :disabled="jobPage<=1" @click="changeJobPage(jobPage-1)"><i class="ti ti-chevron-left" /></button>
-            <span>第 {{ jobPage }} / {{ jobPages }} 页</span>
-            <button class="page-btn" :disabled="jobPage>=jobPages" @click="changeJobPage(jobPage+1)"><i class="ti ti-chevron-right" /></button>
-            <PageJump :current="jobPage" :total="jobPages" @change="changeJobPage" />
+            <span style="font-size:.773rem;color:var(--ink-3);margin-right:auto">{{ jobsLoading ? '正在加载岗位…' : `共 ${jobTotal} 条岗位` }}</span>
+            <button class="page-btn" aria-label="上一页岗位" :disabled="jobsLoading || jobPage<=1" @click="changeJobPage(jobPage-1)"><i class="ti ti-chevron-left" /></button>
+            <span v-if="!jobsLoading">第 {{ jobPage }} / {{ jobPages }} 页</span>
+            <button class="page-btn" aria-label="下一页岗位" :disabled="jobsLoading || jobPage>=jobPages" @click="changeJobPage(jobPage+1)"><i class="ti ti-chevron-right" /></button>
+            <PageJump :current="jobPage" :total="jobPages" :disabled="jobsLoading" @change="changeJobPage" />
           </div>
         </div>
 
@@ -1004,7 +1036,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, reactive, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import AppToast from '@/components/AppToast.vue'
 import PageJump from '@/components/PageJump.vue'
 import QuestionnaireTemplates from '@/components/QuestionnaireTemplates.vue'
@@ -1033,11 +1065,15 @@ import {
 } from '@/lib/jobImport.mjs'
 import { EDU_OPTIONS, formatCities, normalizeJobRequirements } from '@/lib/jobRequirements.mjs'
 import { canApplyTemplateToJob, cloneTemplateQuestions } from '@/lib/questionnaireTemplates.mjs'
+import { JOB_CATEGORIES, RECRUIT_TYPES, PROVINCES } from '@/lib/jobBrowse.mjs'
+import { normalizeAdminJobFilters, buildAdminJobListParams } from '@/lib/adminJobFilters.mjs'
 
 const toast = useToast()
 const v     = ref('list')
 const sk    = ref('')
 const sf    = ref('')
+const jobFilters = reactive({ province: '', city: '', category: '', recruit: '' })
+const appliedJobFilters = ref(normalizeAdminJobFilters())
 const selected     = ref([])
 const draftSelected = ref([])
 const bulkImportInput = ref(null)
@@ -1285,6 +1321,10 @@ const jobPage = ref(1)
 const jobPages = ref(1)
 const jobTotal = ref(0)
 const JOB_PAGE_SIZE = 20
+const jobsLoading = ref(false)
+const jobsError = ref('')
+let jobListRequest = 0
+let adminListAlive = true
 const draftJobs = ref([])
 const draftPage = ref(1)
 const draftPages = ref(1)
@@ -1311,16 +1351,16 @@ const JOB_SUB_CATEGORY_LABEL = {
 }
 
 async function loadJobs() {
+  if (!adminListAlive) return
+  const request = ++jobListRequest
+  jobsLoading.value = true
+  jobsError.value = ''
+  jobs.value = []
+  selected.value = []
   try {
-    const readParams = new URLSearchParams({
-      page: String(jobPage.value), size: String(JOB_PAGE_SIZE),
-    })
-    if (sk.value.trim()) readParams.set('keyword', sk.value.trim())
-    if (sf.value === 'RECOMMENDED') {
-      readParams.set('status', 'PUBLISHED')
-      readParams.set('recommended', 'true')
-    } else if (sf.value) readParams.set('status', sf.value)
+    const readParams = buildAdminJobListParams(appliedJobFilters.value, jobPage.value)
     const readPage = await readJson(`/admin/job-post/list?${readParams}`)
+    if (!adminListAlive || request !== jobListRequest) return
     const readPages = Math.max(1, Number(readPage?.totalPages || 1))
     if (jobPage.value > readPages) {
       jobPage.value = readPages
@@ -1334,10 +1374,14 @@ async function loadJobs() {
     jobTotal.value = Number(readPage?.total || 0)
     jobPages.value = readPages
   } catch (readError) {
+    if (!adminListAlive || request !== jobListRequest) return
     jobs.value = []
     jobTotal.value = 0
     jobPages.value = 1
-    toast.error(readError?.message || '加载岗位失败')
+    jobPage.value = 1
+    jobsError.value = readError?.message || '加载岗位失败，请重试'
+  } finally {
+    if (adminListAlive && request === jobListRequest) jobsLoading.value = false
   }
 }
 
@@ -1368,13 +1412,34 @@ async function loadDrafts() {
 }
 
 function searchAdminJobs() {
+  return applyAdminJobFilters(sk.value)
+}
+
+function changeAdminJobFilters() {
+  return applyAdminJobFilters(appliedJobFilters.value.keyword)
+}
+
+function applyAdminJobFilters(keyword) {
+  appliedJobFilters.value = normalizeAdminJobFilters({ ...jobFilters, keyword, status: sf.value })
   jobPage.value = 1
   selected.value = []
-  loadJobs()
+  return loadJobs()
+}
+
+function changeAdminProvince() {
+  jobFilters.city = ''
+  return changeAdminJobFilters()
+}
+
+function resetAdminJobFilters() {
+  sk.value = ''
+  sf.value = ''
+  Object.assign(jobFilters, { province: '', city: '', category: '', recruit: '' })
+  return searchAdminJobs()
 }
 
 function changeJobPage(readPage) {
-  if (readPage < 1 || readPage > jobPages.value || readPage === jobPage.value) return
+  if (jobsLoading.value || readPage < 1 || readPage > jobPages.value || readPage === jobPage.value) return
   jobPage.value = readPage
   selected.value = []
   loadJobs()
@@ -1389,8 +1454,6 @@ function changeDraftPage(readPage) {
 
 function showJobs() { v.value = 'list'; loadJobs() }
 function showDrafts() { v.value = 'drafts'; loadDrafts() }
-
-watch(sf, searchAdminJobs)
 
 async function loadRecycleBin() {
   recycleLoading.value = true
@@ -1485,10 +1548,12 @@ async function toggleRec(updateJob) {
 }
 async function publish(updateJob) {
   await updateJobPost(updateJob, { status:'PUBLISHED' })
+  await loadJobs()
   toast.success('已发布上线')
 }
 async function unpublishJob(updateJob) {
   await updateJobPost(updateJob, { status:'OFFLINE' })
+  await loadJobs()
   toast.success('已停止发布')
 }
 
@@ -1501,6 +1566,17 @@ async function updateJobPost(updateJob, updateFields) {
 }
 
 // 批量操作
+async function updateJobBatch(updateJobs, updateFields) {
+  const results = await Promise.allSettled(updateJobs.map(updateJob => updateJobPost(updateJob, updateFields)))
+  await loadJobs()
+  const failures = results.filter(result => result.status === 'rejected').length
+  if (failures) {
+    toast.error(`${results.length - failures} 条成功，${failures} 条失败，请核对列表后重试。`)
+    return false
+  }
+  return true
+}
+
 const publishableCount = computed(() => selected.value.filter(id => jobs.value.find(j=>j.id===id)?.status === 'OFFLINE').length)
 const offlinableCount  = computed(() => selected.value.filter(id => jobs.value.find(j => j.id === id)?.status === 'PUBLISHED').length)
 const recableCount = computed(() => selected.value.filter(id => jobs.value.find(j => j.id === id)?.status === 'PUBLISHED').length)
@@ -1511,15 +1587,14 @@ async function bulkPublish() {
   const skipped = selected.value.length - n
   const updateJobs = jobs.value.filter(readJob => selected.value.includes(readJob.id)
     && readJob.status === 'OFFLINE')
-  await Promise.all(updateJobs.map(updateJob => updateJobPost(updateJob, { status:'PUBLISHED' })))
+  if (!await updateJobBatch(updateJobs, { status:'PUBLISHED' })) return
   toast.success(skipped > 0 ? `已发布 ${n} 条，跳过 ${skipped} 条（已发布或投递已结束）` : `已发布 ${n} 条`)
   selected.value = []
 }
 async function bulkRec(updateRecommended) {
   const n = selected.value.length
   const updateJobs = jobs.value.filter(readJob => selected.value.includes(readJob.id))
-  await Promise.all(updateJobs.map(updateJob => updateJobPost(updateJob, { recommended:updateRecommended })))
-  if (sf.value === 'RECOMMENDED') await loadJobs()
+  if (!await updateJobBatch(updateJobs, { recommended:updateRecommended })) return
   toast.success(updateRecommended ? `已将 ${n} 条设为推荐` : `已取消 ${n} 条推荐`)
   selected.value = []
 }
@@ -1529,8 +1604,7 @@ async function bulkOffline() {
   const skipped = selected.value.length - n
   const updateJobs = jobs.value.filter(readJob => selected.value.includes(readJob.id)
     && readJob.status === 'PUBLISHED')
-  await Promise.all(updateJobs.map(updateJob => updateJobPost(updateJob, { status:'OFFLINE' })))
-  if (sf.value === 'RECOMMENDED') await loadJobs()
+  if (!await updateJobBatch(updateJobs, { status:'OFFLINE' })) return
   toast.success(skipped > 0 ? `已停止发布 ${n} 条，跳过 ${skipped} 条（未发布或投递已结束）` : `已停止发布 ${n} 条`)
   selected.value = []
 }
@@ -2073,6 +2147,11 @@ onMounted(() => {
   loadDrafts()
 })
 
+onBeforeUnmount(() => {
+  adminListAlive = false
+  jobListRequest += 1
+})
+
 async function exportData() {
   if (!currentJobGroup.value) return
   if (!exportContent.value.length) {
@@ -2104,6 +2183,14 @@ async function exportData() {
 </script>
 
 <style scoped>
+.admin-job-filters { padding: 1rem; margin-bottom: 1.1rem; }
+.admin-filter-search { display: flex; align-items: flex-end; gap: .625rem; margin-bottom: .875rem; flex-wrap: wrap; }
+.admin-job-filters label { display: grid; gap: .35rem; min-width: 0; font-size: .78rem; color: var(--ink-2); }
+.admin-filter-keyword { flex: 1 1 180px; }
+.admin-filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); gap: .75rem; }
+.admin-job-filters .form-control { min-width: 0; width: 100%; }
+.admin-list-state { padding: 2rem 1rem; text-align: center; color: var(--ink-3); }
+.admin-list-state p { margin-bottom: .75rem; }
 .questionnaire-editor-head, .questionnaire-editor-actions {
   display: flex;
   align-items: center;
