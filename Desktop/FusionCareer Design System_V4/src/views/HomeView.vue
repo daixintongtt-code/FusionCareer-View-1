@@ -356,11 +356,11 @@ onUnmounted(()=> { disposed=true; ++identityRequestId; ++jobsRequestId; window.r
 .chips-clear { border:0; background:none; color:var(--ink-2); text-decoration:underline; font-size:12px; padding:.3rem; }
 .list-bar { justify-content:space-between; flex-wrap:wrap; margin:1rem 0 .75rem; scroll-margin-top:calc(var(--nav-h) + 1rem); }
 .list-count { font-size:13px; color:var(--ink-2); }
-.sort-area { display:flex; flex-direction:column; align-items:flex-end; gap:.25rem; }
+.sort-area { display:flex; flex-direction:column; align-items:center; gap:.25rem; }
 .sort-toggle { display:flex; gap:.25rem; padding:.2rem; border:1px solid var(--border); border-radius:var(--r-full); background:var(--bg-soft); }
-.sort-btn { border:0; border-radius:var(--r-full); padding:.3rem .7rem; font-size:13px; color:var(--ink-2); background:none; }
+.sort-btn { flex:1; border:0; border-radius:var(--r-full); padding:.3rem .7rem; font-size:13px; text-align:center; white-space:nowrap; color:var(--ink-2); background:none; }
 .sort-btn.active { color:var(--red); background:var(--bg-card); font-weight:600; }
-.sort-hint { font-size:12px; color:var(--ink-3); }
+.sort-hint { width:100%; text-align:center; font-size:12px; color:var(--ink-3); }
 .job-list { display:flex; flex-direction:column; gap:.5rem; }
 .job-card { display:flex; align-items:center; flex-wrap:wrap; gap:.65rem; padding:.8rem 1rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--r-lg); }
 .job-card:hover { border-color:var(--border-mid); }
@@ -394,7 +394,6 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible { 
   .job-card { padding:.9rem; }
   .job-main { flex-basis:100%; }
   .job-actions { width:100%; justify-content:space-between; }
-  .sort-area { align-items:flex-start; }
   .pagination { justify-content:flex-start; }
 }
 </style>
