@@ -2,7 +2,7 @@
   <nav class="navbar">
     <div class="navbar-inner">
       <RouterLink class="brand" to="/home">
-        <div class="brand-dot"><i class="ti ti-map-pin-filled" /></div>
+        <div class="brand-dot"><img src="/brand/fusion-career-logo.png" alt="复新生涯" /></div>
         <div>
           <div class="brand-zh">复新生涯</div>
           <div class="brand-en">FusionCareer</div>
