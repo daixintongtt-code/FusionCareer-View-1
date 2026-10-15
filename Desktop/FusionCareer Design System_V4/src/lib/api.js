@@ -64,6 +64,7 @@ export async function readJson(readPath, readOptions = {}) {
   if (readBody.code === 200) return readBody.data
   const createError = new Error(readBody.message || `请求失败 (${readBody.code})`)
   createError.code = readBody.code
+  createError.serverMessage = typeof readBody.message === 'string' ? readBody.message : ''
   throw createError
 }
 

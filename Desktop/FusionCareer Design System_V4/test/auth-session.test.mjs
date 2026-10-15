@@ -88,6 +88,20 @@ for (const status of [200, 409]) {
   })
 }
 
+for (const status of [200, 400]) {
+  test(`readJson preserves raw validation reasons separately from fallback messages for HTTP ${status}`, async t => {
+    for (const message of ['模板题目过多', '', '   ', undefined, null]) {
+      const { harness, api } = await apiHarness(t)
+      const pending = api.readJson('/admin/questionnaire/templates', { method: 'POST', body: '{}' })
+      const rejected = assert.rejects(pending, error => error.code === 400
+        && error.serverMessage === (typeof message === 'string' ? message : ''))
+      harness.requests[0].resolve(new Response(JSON.stringify({ code: 400, message, data: null }), { status }))
+      await rejected
+      assert.equal(harness.token, 'token-a')
+    }
+  })
+}
+
 for (const method of ['requestApi', 'downloadFile']) {
   test(`${method} preserves a new token when an old request returns 401`, async t => {
     const { harness, api } = await apiHarness(t)

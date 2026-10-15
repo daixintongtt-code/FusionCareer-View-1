@@ -289,7 +289,7 @@ async function saveTemplate() {
       : error?.code === 401
         ? '登录已失效，请重新登录后保存。'
         : error?.code === 400
-          ? error.message?.trim() || '模板内容不符合要求，请检查后重新保存。'
+          ? (error.serverMessage ?? error.message)?.trim() || '模板内容不符合要求，请检查后重新保存。'
           : '保存结果未确认，请先查看模板列表核对后，再决定是否重新保存。'
   } finally {
     if (alive) saving.value = false
@@ -313,7 +313,7 @@ function onDialogKeydown(event) {
   const elements = Array.from(panel?.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]') || [])
   const first = elements[0], last = elements.at(-1)
   if (!first) { event.preventDefault(); panel?.focus(); return }
-  if (!panel.contains(document.activeElement) || (event.shiftKey && document.activeElement === first)) {
+  if (!elements.includes(document.activeElement) || (event.shiftKey && document.activeElement === first)) {
     event.preventDefault()
     ;(event.shiftKey ? last : first).focus()
   } else if (!event.shiftKey && document.activeElement === last) {

@@ -207,7 +207,7 @@ test('validation failures without a usable message still explain that the templa
     app.state.openSave()
     app.state.templateName.value = '申请表'
     const pending = app.state.saveTemplate()
-    app.requests[0].reject(Object.assign(new Error(message), { code: 400 }))
+    app.requests[0].reject(Object.assign(new Error(message || '请求失败 (400)'), { code: 400, serverMessage: message }))
     await pending
     assert.equal(app.state.saveError.value, '模板内容不符合要求，请检查后重新保存。')
     assert.doesNotMatch(app.state.saveError.value, /未确认/)
@@ -365,6 +365,26 @@ test('Tab wraps within the dialog and Escape closes a picker', async () => {
   assert.equal(app.state.mode.value, null)
   assert.equal(app.returnFocusCount(), 1)
   app.requests[0].resolve([])
+  app.unmount()
+})
+
+test('Shift+Tab from the dialog container after a failed save stays inside the modal', async () => {
+  const app = setup({ questions: [question()] })
+  const first = { focus() { app.browserDocument.activeElement = first } }
+  const last = { focus() { app.browserDocument.activeElement = last } }
+  const panel = { querySelector: () => first, querySelectorAll: () => [first, last], contains: element => element === panel || element === first || element === last }
+  app.state.dialogRef.value = panel
+  app.state.openSave()
+  app.state.templateName.value = '申请表'
+  const pending = app.state.saveTemplate()
+  app.requests[0].reject(Object.assign(new Error('校验失败'), { code: 400 }))
+  await pending
+  app.browserDocument.activeElement = panel
+  let prevented = false
+  app.state.onDialogKeydown({ key: 'Tab', shiftKey: true, preventDefault() { prevented = true } })
+  assert.equal(prevented, true)
+  assert.equal(app.browserDocument.activeElement, last)
+  assert.equal(app.state.mode.value, 'save')
   app.unmount()
 })
 
