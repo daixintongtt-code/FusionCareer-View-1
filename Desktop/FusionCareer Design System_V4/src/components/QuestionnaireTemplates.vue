@@ -288,7 +288,9 @@ async function saveTemplate() {
       ? '模板名称已存在，请更换名称后重新保存。'
       : error?.code === 401
         ? '登录已失效，请重新登录后保存。'
-        : '保存结果未确认，请先查看模板列表核对后，再决定是否重新保存。'
+        : error?.code === 400
+          ? error.message?.trim() || '模板内容不符合要求，请检查后重新保存。'
+          : '保存结果未确认，请先查看模板列表核对后，再决定是否重新保存。'
   } finally {
     if (alive) saving.value = false
   }

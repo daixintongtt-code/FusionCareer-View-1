@@ -182,6 +182,40 @@ test('save errors remain visible and require an explicit retry after checking un
   app.unmount()
 })
 
+test('server validation failures show their message and preserve the editable template', async () => {
+  const app = setup({ questions: [question()] })
+  app.state.openSave()
+  app.state.templateName.value = '申请表'
+  const pending = app.state.saveTemplate()
+  const message = '模板最多允许 50 道题目，请减少题目后重试。'
+  app.requests[0].reject(Object.assign(new Error(message), { code: 400 }))
+  await pending
+  assert.equal(app.state.saveError.value, message)
+  assert.equal(app.state.mode.value, 'save')
+  assert.equal(app.state.saving.value, false)
+  assert.equal(app.state.templateName.value, '申请表')
+  assert.deepEqual(app.state.saveSnapshot.value, templates.cloneTemplateQuestions([question()]))
+  assert.equal(app.state.notice.value, '')
+  assert.equal(app.requests.length, 1)
+  assert.ok((await html(app)).includes(message))
+  app.unmount()
+})
+
+test('validation failures without a usable message still explain that the template was rejected', async () => {
+  for (const message of ['', '   ']) {
+    const app = setup({ questions: [question()] })
+    app.state.openSave()
+    app.state.templateName.value = '申请表'
+    const pending = app.state.saveTemplate()
+    app.requests[0].reject(Object.assign(new Error(message), { code: 400 }))
+    await pending
+    assert.equal(app.state.saveError.value, '模板内容不符合要求，请检查后重新保存。')
+    assert.doesNotMatch(app.state.saveError.value, /未确认/)
+    assert.equal(app.state.mode.value, 'save')
+    app.unmount()
+  }
+})
+
 test('invalid and overlong names cannot create templates and Unicode length is counted correctly', async () => {
   const invalid = setup({ questions: [question('')] })
   assert.ok(invalid.state.saveDisabledReason.value)
