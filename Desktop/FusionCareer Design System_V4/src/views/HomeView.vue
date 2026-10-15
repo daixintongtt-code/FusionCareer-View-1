@@ -128,6 +128,7 @@
           <button class="page-btn page-nav" :disabled="filters.page===totalPages" @click="goPage(filters.page+1)">下一页</button>
           <PageJump :current="filters.page" :total="totalPages" :disabled="loading" @change="goPage" />
         </nav>
+        <p class="mission-line">深度参与“培用”融通，服务“四用”新闻人才培养</p>
       </div>
     </main>
   </div>
@@ -323,6 +324,7 @@ onUnmounted(()=> { disposed=true; ++identityRequestId; ++jobsRequestId; window.r
 
 <style scoped>
 .home-view .page { padding-bottom:7.5rem; }
+.mission-line { margin:2.5rem 0 .25rem; color:var(--ink-3); font-family:var(--font-serif); font-size:.82rem; line-height:1.6; letter-spacing:.035em; text-align:center; }
 .recommendations { margin-bottom:.85rem; padding:1rem 1.25rem; }
 .recommendation-heading,.carousel-actions,.search-heading,.list-bar,.job-title-row,.job-actions { display:flex; align-items:center; gap:.6rem; }
 .recommendation-heading { justify-content:space-between; margin-bottom:.75rem; }
@@ -388,6 +390,7 @@ onUnmounted(()=> { disposed=true; ++identityRequestId; ++jobsRequestId; window.r
 button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible { outline:2px solid var(--red); outline-offset:3px; }
 @media (max-width:640px) {
   .home-view .wrap { padding:0 1rem; }
+  .mission-line { margin-top:2rem; font-size:.78rem; }
   .frow { padding:.7rem .85rem; }
   .fcell-location,.location-pair { width:100%; }
   .location-pair .filter-select { flex:1; min-width:0; }
