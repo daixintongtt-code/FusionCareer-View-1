@@ -62,7 +62,10 @@ export async function readJson(readPath, readOptions = {}) {
   const { body: readBody } = await requestApi(readPath, readOptions)
   if (readBody == null) throw new Error('空响应')
   if (readBody.code === 200) return readBody.data
-  throw new Error(readBody.message || `请求失败 (${readBody.code})`)
+  const createError = new Error(readBody.message || `请求失败 (${readBody.code})`)
+  createError.code = readBody.code
+  createError.serverMessage = typeof readBody.message === 'string' ? readBody.message : ''
+  throw createError
 }
 
 export async function uploadForm(readPath, uploadBody) {
