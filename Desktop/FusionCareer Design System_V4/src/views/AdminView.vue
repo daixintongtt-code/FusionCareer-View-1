@@ -230,14 +230,17 @@
 
         <!-- ───── 新建/编辑岗位 ───── -->
         <div v-if="v==='create'">
+          <div v-if="editingId" class="job-editor-navigation">
+            <button type="button" class="btn btn-primary job-editor-back" @click="leaveJobEditor">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m12 5-7 7 7 7M5 12h14" /></svg>
+              <span>{{ editingReturnView === 'drafts' ? '返回草稿箱' : '返回岗位列表' }}</span>
+            </button>
+          </div>
           <div class="page-hd">
             <div>
               <h1><i :class="editingId?'ti ti-edit':'ti ti-plus'" />{{ editingId ? '编辑岗位' : '新建岗位' }}</h1>
               <p>{{ editingId ? '修改岗位信息，确认后保存发布' : '粘贴原始岗位描述，智能识别后校对发布' }}</p>
             </div>
-            <button v-if="editingId" class="btn btn-secondary btn-sm" @click="leaveJobEditor">
-              <i class="ti ti-arrow-left" />{{ editingReturnView === 'drafts' ? '返回草稿箱' : '返回岗位列表' }}
-            </button>
           </div>
 
           <div v-if="!editingId" class="create-entry-grid">
@@ -2183,6 +2186,11 @@ async function exportData() {
 </script>
 
 <style scoped>
+.job-editor-navigation { display: flex; margin-bottom: 1rem; }
+.job-editor-back { min-width: 0; max-width: 100%; min-height: 44px; padding: .75rem 1rem; font-size: .933rem; font-weight: 600; line-height: 1.4; white-space: normal; }
+.job-editor-back svg { width: 1.2rem; height: 1.2rem; flex-shrink: 0; }
+.job-editor-back span { min-width: 0; }
+.job-editor-back:focus-visible { outline: 3px solid var(--red); outline-offset: 3px; }
 .admin-job-filters { padding: 1rem; margin-bottom: 1.1rem; }
 .admin-filter-search { display: flex; align-items: flex-end; gap: .625rem; margin-bottom: .875rem; flex-wrap: wrap; }
 .admin-job-filters label { display: grid; gap: .35rem; min-width: 0; font-size: .78rem; color: var(--ink-2); }
